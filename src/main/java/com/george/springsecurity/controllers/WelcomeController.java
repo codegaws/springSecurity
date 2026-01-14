@@ -5,6 +5,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
 
 @RestController
@@ -15,4 +16,13 @@ public class WelcomeController {
     public Map<String, String> welcome() {
         return Collections.singletonMap("message", "Welcome to Spring Security!");
     }
+
+    /*
+    public Map<String, String> welcome() {
+        Map<String, String> map = new HashMap<>();
+        map.put("message", "Welcome to Spring Security!");
+        return map;
+    }
+     */
+
 }
