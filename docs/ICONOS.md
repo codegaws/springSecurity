@@ -18,4 +18,7 @@ Aquí tienes una lista de iconos útiles para documentación en Markdown sobre S
 - 🧩 Integración
 - 🔄 Actualización
 - 🕵️‍♂️ Auditoría / Monitoreo
+- Base de datos: 🗄️  (o 🗃️)
+- Usuario: 👤
+- Contraseña: 🔒  (o 🔑)
 
