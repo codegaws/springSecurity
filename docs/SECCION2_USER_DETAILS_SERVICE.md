@@ -419,6 +419,38 @@ new User(
 );
 ```
 
+#### ¿Por que Map?
+> ¿Por qué .map()?
+> Transforma CustomerEntity → UserDetails recuerda que User viene de UserDetails
+> Evita NullPointerException automáticamente
+> Permite encadenar .orElseThrow() de forma elegante
+> Código funcional más corto y legible
+
+## 🔄 **Diagrama visual del flujo**
+🧩 Analogía para entender .map()
+```
+┌─────────────────────────────────────┐
+│ findByEmail("admin@example.com")    │
+└───────────────┬─────────────────────┘
+                │
+        ┌───────┴────────┐
+        │                │
+    🟢 Existe        🔴 No existe
+        │                │
+        ▼                │
+┌──────────────────┐     │
+│ .map() ejecuta   │     │
+│ la transformación│     │
+└────────┬─────────┘     │
+         │               │
+         ▼               ▼
+┌──────────────────┐ ┌──────────────────┐
+│ Retorna:         │ │ .orElseThrow()   │
+│ Optional<User>   │ │ lanza excepción  │
+│ ✅ lleno         │ │ ❌               │
+└──────────────────┘ └──────────────────┘
+```
+
 ---
 
 ### 5️⃣ **`.orElseThrow(...)` - Manejo de usuario no encontrado**
