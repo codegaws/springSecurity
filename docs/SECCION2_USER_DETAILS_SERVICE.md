@@ -618,4 +618,7 @@ ponla disponible para que otras clases la usen sin que yo tenga que instanciarla
 El contenedor es donde Spring guarda todos esos objetos creados.
 =======
 ```
->>>>>>> origin/main
+
+
+## 📝 Clase 23 - 👤👤 Probando Implementacion UserDetailsService 🔒 🔑🔑
+

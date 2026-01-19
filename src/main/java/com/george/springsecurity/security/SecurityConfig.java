@@ -46,13 +46,18 @@ public class SecurityConfig {
                 .build();
         return new InMemoryUserDetailsManager(admin, user);
     }*/
-    @Bean
+
+    //Como ya he realizado una implementacion personalizada de UserDetailsService
+    //ahora uso JdbcUserDetailsManager para obtener los detalles de los usuarios desde la base de datos
+   /* @Bean
     UserDetailsService userDetailsService(DataSource dataSource) {
         return new JdbcUserDetailsManager(dataSource);
     }
+   */
 
     @Bean
     PasswordEncoder passwordEncoder() {
         return NoOpPasswordEncoder.getInstance();//esta deprecado es fake solo es para pruebas solo es de momento
     }
+
 }
