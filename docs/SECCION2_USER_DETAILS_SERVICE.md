@@ -19,7 +19,6 @@
 ### 📝Dato adicional: 
 - ¿por que usar var?
 
-<<<<<<< HEAD
 Sí, puedes usar `var` desde Java 10 en adelante (incluyendo Java 17). Cuando usas `var`, el compilador de Java infiere el tipo de la variable 
 a partir del valor que se le asigna. En este caso, el método `User.withUsername(...).password(...).authorities(...).build()` retorna un objeto de 
 tipo `UserDetails`, por lo que el compilador infiere que `var admin` y `var user` son de tipo `UserDetails`.
@@ -618,7 +617,47 @@ ponla disponible para que otras clases la usen sin que yo tenga que instanciarla
 El contenedor es donde Spring guarda todos esos objetos creados.
 =======
 ```
+### INFORMACION ADICIONAL SOBRE EL FLUJO DEL METODO 👤🔑
+Tu explicación es bastante acertada, pero te detallo y corrijo algunos puntos clave para mayor claridad:
 
+1. **Inyección de dependencias**:  
+   Usas `private final CustomerRepository customerRepository;` y la anotación `@AllArgsConstructor` para que Spring inyecte el repositorio automáticamente. No necesitas el `@Autowired` porque el constructor se genera y Spring lo gestiona.
 
-## 📝 Clase 23 - 👤👤 Probando Implementacion UserDetailsService 🔒 🔑🔑
+2. **Uso de Optional**:  
+   El método `findByEmail(username)` retorna un `Optional<Customer>`. Usas `.map(...)` para transformar el `Customer` en un objeto `UserDetails`. Si no existe, usas `.orElseThrow(...)` para lanzar la excepción.
+
+3. **Transformación a UserDetails**:  
+   En el `map`, conviertes el `Customer` en un objeto `User` de Spring Security, que implementa `UserDetails`.  
+   - Creas una lista de autoridades con el rol del usuario:  
+     `List.of(new SimpleGrantedAuthority(customer.getRole()))`
+   - Retornas el nuevo usuario con email, password y roles.
+
+4. **Retorno del método**:  
+   El método retorna el `UserDetails` que Spring Security usará para autenticar y autorizar al usuario.
+
+**Corrección y mejora de explicación:**
+- El método `loadUserByUsername` debe devolver siempre un objeto que implemente `UserDetails` (en este caso, `User` de Spring Security).
+- El rol debe estar en el formato correcto (por ejemplo, `"ROLE_USER"`).
+- Si el usuario no existe, se lanza `UsernameNotFoundException`.
+- El password debe estar correctamente codificado (no en texto plano en producción).
+
+**Resumen de fases:**
+1. Inyectas el repositorio con el constructor.
+2. Buscas el usuario por email usando el repositorio.
+3. Si existe, lo transformas en un `UserDetails` con sus datos y rol.
+4. Si no existe, lanzas una excepción.
+
+Tu código está bien estructurado y sigue las buenas prácticas de Spring Security. Solo asegúrate de que el rol esté en el formato correcto y que la contraseña esté codificada adecuadamente.
+
+### CONVENCION ROLE_NOMBRE 👤
+Sí, si en la base de datos guardas el rol como `ROLE_ADMIN`, entonces en tu código **no necesitas** agregar el prefijo `ROLE_` al crear la autoridad. Solo usa el valor tal cual:
+
+```java
+var authorities = List.of(new SimpleGrantedAuthority(customer.getRole()));
+```
+
+Spring Security ya reconocerá el rol correctamente porque tiene el formato esperado (`ROLE_...`).  
+Solo asegúrate de que todos los roles en la base de datos sigan ese mismo formato (`ROLE_NOMBRE`).
+
+## 📝 Clase probando - 👤👤 Probando Implementacion UserDetailsService 🔒 🔑🔑
 
