@@ -48,15 +48,17 @@ public class SecurityConfig {
         return new JdbcUserDetailsManager(dataSource);
     }
 
-
+*/
     @Bean
     PasswordEncoder passwordEncoder() {
-        return NoOpPasswordEncoder.getInstance();//esta deprecado es fake solo es para pruebas solo es de momento
+        return NoOpPasswordEncoder.getInstance();//esta deprecado es fake solo es para pruebas solo es de momento, COMO NO TIENE CONSTRUCTOR POR ESO SE LE AGREGA EL METODO getInstance
     }
-    */
 
+    /*
     @Bean
     PasswordEncoder passwordEncoder(){
         return new BCryptPasswordEncoder();
     }
+    */
+
 }
