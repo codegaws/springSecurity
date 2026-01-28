@@ -9,6 +9,8 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.NoOpPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
 
 @Configuration
 public class SecurityConfig {
@@ -65,5 +67,10 @@ public class SecurityConfig {
         return new BCryptPasswordEncoder();
     }
     */
+
+    CorsConfigurationSource corsConfigurationSource() {
+        var config = new CorsConfiguration();
+
+    }
 
 }
