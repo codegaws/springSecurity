@@ -22,8 +22,7 @@ public class MyAuthenticationProvider implements AuthenticationProvider {
     private PasswordEncoder passwordEncoder;
 
     @Override
-
-    public @Nullable Authentication authenticate(Authentication authentication) throws AuthenticationException {
+    public Authentication authenticate(Authentication authentication) throws AuthenticationException {
         final var username = authentication.getName();
         final var pwd = authentication.getCredentials().toString();
 
@@ -31,7 +30,7 @@ public class MyAuthenticationProvider implements AuthenticationProvider {
         final var customer = customerFromDb.orElseThrow(() -> new BadCredentialsException("Ivalid credentials!!"));
         final var customerPwd = customer.getPassword();
 
-        if (passwordEncoder.matches(pwd, customerPwd)) {
+        if (passwordEncoder.matches(pwd, customerPwd)) {//machear el pass coincide con el de la bd
             final var authorities = Collections.singletonList(new SimpleGrantedAuthority(customer.getRole()));
             return new UsernamePasswordAuthenticationToken(username, pwd, authorities);
         } else {

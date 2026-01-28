@@ -166,3 +166,28 @@ public class MyAuthenticationProvider implements AuthenticationProvider {
 
 ```
 
+### IMPLEMENTAS EL AuthenticationProvider -> genera dos metodos por default
+- @Nullable Authentication authenticate(Authentication authentication) throws AuthenticationException;
+
+- boolean supports(Class<?> authentication);
+
+
+### NOTA SOBRE OPTIONAL Y EL ORELSETHROW()-> esto se puede manejar con IF pero se esta haciendo con un Optional mas elegante.
+
+En Java, usando `Optional`, puedes hacer:
+
+```java
+final var customer = customerFromDb.orElseThrow(() -> new BadCredentialsException("Ivalid credentials!!"));
+```
+
+Esto significa:
+- Si el `Optional` tiene valor, lo devuelve.
+- Si está vacío, lanza la excepción que indiques.
+
+Es una forma muy común y recomendada de manejar valores opcionales en Java moderno.
+
+## 📝 Clase 34 - PROBANDO NUESTRO AUTHENTICATION PROVIDER🔒
+
+- EN CASO SALGA ALGUN ERROR DESHABILITA EN SECURITYCONFIG. ->
+  http.cors(AbstractHttpConfigurer::disable);
+  http.csrf(AbstractHttpConfigurer::disable);
