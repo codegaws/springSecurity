@@ -4,10 +4,13 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.NoOpPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
 
 @Configuration
 public class SecurityConfig {
@@ -22,6 +25,10 @@ public class SecurityConfig {
                                 .anyRequest().permitAll())
                 .formLogin(Customizer.withDefaults())
                 .httpBasic(Customizer.withDefaults());
+        http.cors(AbstractHttpConfigurer::disable);
+        http.csrf(AbstractHttpConfigurer::disable);
+
+
         return http.build();
     }
 
@@ -48,15 +55,22 @@ public class SecurityConfig {
         return new JdbcUserDetailsManager(dataSource);
     }
 
-
+*/
     @Bean
     PasswordEncoder passwordEncoder() {
-        return NoOpPasswordEncoder.getInstance();//esta deprecado es fake solo es para pruebas solo es de momento
+        return NoOpPasswordEncoder.getInstance();//esta deprecado es fake solo es para pruebas solo es de momento, COMO NO TIENE CONSTRUCTOR POR ESO SE LE AGREGA EL METODO getInstance
     }
-    */
 
+    /*
     @Bean
     PasswordEncoder passwordEncoder(){
         return new BCryptPasswordEncoder();
     }
+    */
+
+    CorsConfigurationSource corsConfigurationSource() {
+        var config = new CorsConfiguration();
+
+    }
+
 }
