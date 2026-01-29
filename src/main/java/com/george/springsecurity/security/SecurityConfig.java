@@ -11,6 +11,9 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+
+import java.util.List;
 
 @Configuration
 public class SecurityConfig {
@@ -18,59 +21,33 @@ public class SecurityConfig {
     @Bean
     SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http.authorizeHttpRequests(auth ->
-                        // auth.anyRequest().authenticated())//aqui requiere autenticacion para cualquier solicitud
-                        //auth.anyRequest().permitAll())//aqui permite el acceso sin autenticacion
                         auth.requestMatchers("/loans", "/balance", "/accounts", "/cards")
                                 .authenticated()
                                 .anyRequest().permitAll())
                 .formLogin(Customizer.withDefaults())
                 .httpBasic(Customizer.withDefaults());
-        http.cors(AbstractHttpConfigurer::disable);
-        http.csrf(AbstractHttpConfigurer::disable);
-
-
+        http.cors(cors -> corsConfigurationSource());
         return http.build();
     }
 
-    /*@Bean
-    InMemoryUserDetailsManager inMemoryUserDetailsManager() {
-        // UserDetails admin = User.withUsername("admin") o solo usas var
-        var admin = User.withUsername("admin")
-                .password("to_be_encode")
-                .authorities("ADMIN")
-                .build();
-
-        //UserDetails user = User.withUsername("user")
-        var user = User.withUsername("user")
-                .password("to_be_encode")
-                .authorities("USER")
-                .build();
-        return new InMemoryUserDetailsManager(admin, user);
-    }*/
-
-    //Como ya he realizado una implementacion personalizada de UserDetailsService
-    //ahora uso JdbcUserDetailsManager para obtener los detalles de los usuarios desde la base de datos
-   /* @Bean
-    UserDetailsService userDetailsService(DataSource dataSource) {
-        return new JdbcUserDetailsManager(dataSource);
-    }
-
-*/
     @Bean
     PasswordEncoder passwordEncoder() {
         return NoOpPasswordEncoder.getInstance();//esta deprecado es fake solo es para pruebas solo es de momento, COMO NO TIENE CONSTRUCTOR POR ESO SE LE AGREGA EL METODO getInstance
     }
 
-    /*
     @Bean
-    PasswordEncoder passwordEncoder(){
-        return new BCryptPasswordEncoder();
-    }
-    */
-
     CorsConfigurationSource corsConfigurationSource() {
         var config = new CorsConfiguration();
 
+        //config.setAllowedOrigins(List.of("http://localhost:4200/"));//-> aqui se define que pagina esta permitida
+        config.setAllowedOrigins(List.of("*"));//-> esto quiere decir que cualquier pagina esta permitida
+        //config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        config.setAllowedMethods(List.of("*"));
+        config.setAllowedHeaders(List.of("*"));
+
+        var source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", config);//-> esto quiere decir que cualquier endpoint esta permitido
+        return source;
     }
 
 }

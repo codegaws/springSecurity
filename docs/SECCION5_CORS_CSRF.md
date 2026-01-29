@@ -57,3 +57,43 @@ se configuro frontend.
 
 ![img](img/img_9.png)
 
+- Debemos hacer la lista ya que el CORS lo bloquea por defecto.
+- El navegador bloquea la peticion.
+
+## 📝 Clase 38 - CONFIGURACION DE CORS 🔒 🔒 🔑🔑 🚀
+
+- Se configura el CORS en el backend.->SecurityConfig
+
+```java
+@Configuration
+public class SecurityConfig {
+
+    @Bean
+    SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        http.authorizeHttpRequests(auth ->
+                        auth.requestMatchers("/loans", "/balance", "/accounts", "/cards")
+                                .authenticated()
+                                .anyRequest().permitAll())
+                .formLogin(Customizer.withDefaults())
+                .httpBasic(Customizer.withDefaults());
+        http.cors(cors -> corsConfigurationSource());// agregamos el cors
+        return http.build();
+    }
+
+ @Bean
+    CorsConfigurationSource corsConfigurationSource() {
+        var config = new CorsConfiguration();
+
+        //config.setAllowedOrigins(List.of("http://localhost:4200/"));//-> aqui se define que pagina esta permitida
+        config.setAllowedOrigins(List.of("*"));//-> esto quiere decir que cualquier pagina esta permitida
+        //config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        config.setAllowedMethods(List.of("*"));
+        config.setAllowedHeaders(List.of("*"));
+
+        var source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", config);//-> esto quiere decir que cualquier endpoint esta permitido
+        return source;
+    }
+```
+
+![img](img/img_10.png)
