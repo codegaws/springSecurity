@@ -392,4 +392,338 @@ Si NO llamas a `doFilter()`, la petición **se detiene** y nunca llega a tu cont
 
 ## 💡 ¿Por qué es necesario este filtro?
 
-Por defecto, Spring Security guarda el token CSRF en memoria interna, pero aplicaciones modernas (React, Angular, Vue) necesitan **leerlo desde JavaScript**, por eso tu filtro lo expone en los headers de respuesta.
+Por defecto, Spring Security guarda el token CSRF en memoria interna, pero aplicaciones modernas (React, Angular, Vue) necesitan **leerlo desde JavaScript**, 
+por eso tu filtro lo expone en los headers de respuesta.
+
+---
+
+## 📝 Clase 40 - CONFIGURANDO CSRF 🔒 🔒 🔑🔑 🚀
+
+# 🔧 Explicación del `CsrfTokenRequestAttributeHandler`
+
+## 📋 ¿Qué hace este código?
+
+Este código configura **cómo Spring Security maneja y expone el token CSRF** en los atributos de la petición.
+
+---
+
+## 🏗️ Desglose Línea por Línea
+
+### 1️⃣ **Creación del Handler**
+
+```java
+var requestHandler = new CsrfTokenRequestAttributeHandler();
+```
+
+- Crea un **manejador personalizado** para tokens CSRF
+- Este handler controla cómo se almacena y accede al token durante la petición
+
+---
+
+### 2️⃣ **Configuración del Nombre del Atributo**
+
+```java
+requestHandler.setCsrfRequestAttributeName("_csrf");
+```
+
+- Define que el token CSRF estará disponible con el nombre **`_csrf`**
+- Este nombre se usa para:
+    - ✅ Acceder al token en el backend: `request.getAttribute("_csrf")`
+    - ✅ Leerlo en templates (Thymeleaf, JSP): `${_csrf.token}`
+    - ✅ Enviarlo desde el frontend
+
+---
+
+## 🎯 ¿Por qué `_csrf` por convención?
+
+| Razón | Explicación |
+|-------|-------------|
+| 📚 **Convención de Spring** | Es el nombre estándar que usa Spring Security por defecto |
+| 🔄 **Compatibilidad** | Frameworks frontend esperan este nombre |
+| 📖 **Documentación** | Todos los ejemplos y tutoriales usan `_csrf` |
+
+---
+
+## 💡 Analogía Simple
+
+Imagina una caja fuerte (petición HTTP):
+
+```
+🔐 Token CSRF = Combinación secreta
+📝 "_csrf" = La etiqueta que pegas en la caja
+
+Sin etiqueta → No sabes dónde buscar la combinación
+Con etiqueta "_csrf" → Sabes exactamente dónde encontrarla
+```
+
+---
+
+## 🔗 Relación con tu Filtro Anterior
+
+### Flujo Completo
+
+```
+1. CsrfTokenRequestAttributeHandler
+   • Guarda el token con nombre "_csrf"
+   • Lo almacena en request.getAttribute("_csrf")
+   ↓
+2. Tu CsrfCookieFilter
+   • Lee ese token: request.getAttribute(CsrfToken.class.getName())
+   • Lo expone en el header de respuesta
+```
+
+---
+
+## 📦 Uso en el Frontend
+
+Con esta configuración, puedes acceder al token así:
+
+### 🌐 En HTML/Thymeleaf
+
+```html
+<input type="hidden" name="_csrf" th:value="${_csrf.token}"/>
+```
+
+### 🔧 En JavaScript
+
+```javascript
+// Leer del meta tag
+const token = document.querySelector('meta[name="_csrf"]').content;
+
+// O leer del header de respuesta (con tu filtro)
+fetch('/api/data', {
+    headers: {
+        'X-CSRF-TOKEN': token
+    }
+});
+```
+
+---
+
+## ⚠️ Nota Explicacion del codigo completo : 
+
+```java
+@Configuration
+public class SecurityConfig {
+
+    @Bean
+    SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        var requestHandler = new CsrfTokenRequestAttributeHandler();
+        requestHandler.setCsrfRequestAttributeName("_csrf");//-> este es el nombre con el que vamos a trabajar en el front end por convencion se usa _csrf
+        http.authorizeHttpRequests(auth ->
+                        auth.requestMatchers("/loans", "/balance", "/accounts", "/cards")
+                                .authenticated()
+                                .anyRequest().permitAll())
+                .formLogin(Customizer.withDefaults())
+                .httpBasic(Customizer.withDefaults());
+        http.cors(cors -> corsConfigurationSource());
+        http.csrf(csrf -> csrf
+                        .csrfTokenRequestHandler(requestHandler)
+                        .ignoringRequestMatchers("/welcome", "/about_us")
+                        .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse()))
+                .addFilterAfter(new CsrfCookieFilter(), BasicAuthenticationFilter.class);
+
+        return http.build();
+    }
+```
+
+# 🔐 Explicación Completa de la Configuración CSRF
+
+## 📋 Descripción General
+
+Este código configura **cómo Spring Security maneja la protección CSRF** en tu aplicación, definiendo dónde guardar el token, qué endpoints proteger y cuándo ejecutar tu filtro personalizado.
+
+---
+
+## 🏗️ Desglose Línea por Línea
+
+### 1️⃣ **Configuración Base de CSRF**
+
+```java
+http.csrf(csrf -> csrf
+```
+
+- Activa y configura la protección CSRF
+- El lambda `csrf ->` te permite personalizar el comportamiento
+
+---
+
+### 2️⃣ **Aplicar el Handler Personalizado**
+
+```java
+.csrfTokenRequestHandler(requestHandler)
+```
+
+| Componente | Función |
+|------------|---------|
+| **`requestHandler`** | El objeto que creaste antes con `setCsrfRequestAttributeName("_csrf")` |
+| **Efecto** | Define que el token se almacenará con el nombre `_csrf` en los atributos de la petición |
+
+---
+
+### 3️⃣ **Ignorar Endpoints Públicos**
+
+```java
+.ignoringRequestMatchers("/welcome", "/about_us")
+```
+
+- **Desactiva** la protección CSRF para estos endpoints específicos
+- Útil para páginas públicas que **NO modifican datos**
+
+#### ⚠️ ¿Por qué ignorar ciertos endpoints?
+
+| Endpoint | CSRF Necesario | Razón |
+|----------|----------------|-------|
+| `/welcome` | ❌ NO | Solo muestra información (GET) |
+| `/about_us` | ❌ NO | Solo muestra información (GET) |
+| `/loans` | ✅ SÍ | Modifica datos (POST/PUT/DELETE) |
+| `/accounts` | ✅ SÍ | Accede a datos sensibles |
+
+---
+
+### 4️⃣ **Repositorio de Tokens (Cookie)**
+
+```java
+.csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
+```
+
+#### 🍪 Análisis Detallado
+
+| Configuración | Significado | Implicación |
+|---------------|-------------|-------------|
+| **`CookieCsrfTokenRepository`** | Guarda el token en una **cookie del navegador** | El navegador almacena y envía el token automáticamente |
+| **`withHttpOnlyFalse()`** | La cookie **NO es HttpOnly** | ✅ JavaScript puede leerla<br>⚠️ Vulnerable a XSS |
+
+#### 🔍 ¿Qué significa HttpOnly?
+
+```
+HttpOnly = true  → Solo el servidor puede leer la cookie (más seguro)
+HttpOnly = false → JavaScript puede leer la cookie (necesario para SPAs)
+```
+
+---
+
+### 5️⃣ **Agregar Filtro Personalizado**
+
+```java
+.addFilterAfter(new CsrfCookieFilter(), BasicAuthenticationFilter.class);
+```
+
+#### 🔗 Orden de Ejecución
+
+```
+📥 REQUEST↓
+1️⃣ BasicAuthenticationFilter (valida usuario/contraseña)
+  ↓
+2️⃣ CsrfCookieFilter (TU FILTRO - copia token al header)
+  ↓
+3️⃣ Otros filtros
+  ↓
+🎯 Tu Controlador
+  ↓
+📤 RESPONSE (con token en header Y cookie)
+```
+
+---
+
+## 🎯 Flujo Completo Integrado
+
+### 🔄 Primera Petición (Login)
+
+```
+1. Cliente hace GET /welcome
+   ↓
+2. Spring Security genera token CSRF
+   ↓
+3. requestHandler guarda token con nombre "_csrf"
+   ↓
+4. CookieCsrfTokenRepository crea cookie: XSRF-TOKEN=abc123
+   ↓
+5. CsrfCookieFilter copia token al header: X-CSRF-TOKEN=abc123
+   ↓
+6. Response incluye:
+   • Cookie: XSRF-TOKEN=abc123 (HttpOnly=false)
+   • Header: X-CSRF-TOKEN=abc123
+```
+
+### 🔄 Peticiones Posteriores (Operaciones Protegidas)
+
+```
+1. Cliente hace POST /loans
+   ↓
+2. Navegador envía automáticamente cookie: XSRF-TOKEN=abc123
+   ↓
+3. Spring Security valida token
+   ↓
+4. Si coincide → ✅ Permite operación
+   Si no coincide → ❌ 403 Forbidden
+```
+
+---
+
+## 💡 ¿Por qué esta Configuración Específica?
+
+### 🌐 Para Aplicaciones SPA (React, Angular, Vue)
+
+| Configuración | Razón |
+|---------------|-------|
+| **Cookie Repository** | El navegador maneja automáticamente el envío de cookies |
+| **HttpOnly=false** | JavaScript puede leer el token desde `document.cookie` |
+| **Header en Response** | El frontend puede leerlo desde `response.headers` |
+
+---
+
+## 🔒 Consideraciones de Seguridad
+
+### ⚠️ Riesgos
+
+| Riesgo | Mitigación |
+|--------|-----------|
+| **HttpOnly=false** | Vulnerable a XSS (Cross-Site Scripting) | Sanitizar inputs, CSP headers |
+| **`ignoringRequestMatchers`** | Endpoints sin protección CSRF | Solo usar en endpoints públicos de solo lectura |
+
+### ✅ Mejores Prácticas
+
+```java
+// ✅ BUENO: Ignorar solo endpoints públicos GET
+.ignoringRequestMatchers("/welcome", "/about_us")
+
+// ❌ MALO: Ignorar endpoints que modifican datos
+.ignoringRequestMatchers("/delete-account", "/transfer-money")
+```
+
+---
+
+## 📊 Comparación de Configuraciones
+
+| Configuración | Caso de Uso | Seguridad |
+|---------------|-------------|-----------|
+| **Cookie + HttpOnly=true** | Apps tradicionales (Thymeleaf, JSP) | 🔐 Alta |
+| **Cookie + HttpOnly=false** | SPAs modernas (tu caso) | ⚠️ Media |
+| **Header Only** | APIs REST puras | 🔐 Alta |
+
+---
+
+## 🎓 Resumen para No Desarrolladores
+
+Imagina una discoteca con seguridad:
+
+```
+🎫 Token CSRF = Pulsera de entrada
+
+1. csrfTokenRequestHandler → El sistema que imprime la pulsera
+2. ignoringRequestMatchers → Áreas VIP sin control (baños, terraza)
+3. CookieCsrfTokenRepository → Guardas la pulsera en tu bolsillo
+4. withHttpOnlyFalse → Puedes sacar la pulsera para mostrarla
+5. CsrfCookieFilter → El guardia que verifica tu pulsera y te da un sello visible
+
+Resultado: Tienes la pulsera guardada Y visible para futuras verificaciones
+```
+
+![img](img/img_12.png)
+
+---
+
+![img](img/img_13.png)
+
+### Aqui con el XSRF TOKEN protegemos nuestra sesion 
