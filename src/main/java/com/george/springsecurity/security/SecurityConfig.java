@@ -24,11 +24,12 @@ public class SecurityConfig {
     @Bean
     SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         var requestHandler = new CsrfTokenRequestAttributeHandler();
-        requestHandler.setCsrfRequestAttributeName("_csrf");//-> este es el nombre con el que vamos a trabajar en el front end por convencion se usa _csrf
+        requestHandler.setCsrfRequestAttributeName("_csrf");//-> Resumen: Es básicamente un "alias" o "nombre de variable" para que tanto backend como frontend sepan cómo referirse al token CSRF. con el que vamos a trabajar en el front end por convencion se usa _csrf
         http.authorizeHttpRequests(auth ->
                         auth.requestMatchers("/loans", "/balance", "/accounts", "/cards")
                                 .authenticated()
-                                .anyRequest().permitAll())
+                                .anyRequest()
+                                .permitAll())
                 .formLogin(Customizer.withDefaults())
                 .httpBasic(Customizer.withDefaults());
         http.cors(cors -> corsConfigurationSource());
@@ -59,5 +60,4 @@ public class SecurityConfig {
         source.registerCorsConfiguration("/**", config);//-> esto quiere decir que cualquier endpoint esta permitido
         return source;
     }
-
 }
