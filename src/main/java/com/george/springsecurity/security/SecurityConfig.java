@@ -37,7 +37,6 @@ public class SecurityConfig {
                         .ignoringRequestMatchers("/welcome", "/about_us")
                         .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse()))
                 .addFilterAfter(new CsrfCookieFilter(), BasicAuthenticationFilter.class);
-
         return http.build();
     }
 
