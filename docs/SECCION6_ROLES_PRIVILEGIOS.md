@@ -26,3 +26,34 @@
 
 ![img](../img/img_20.png)
 
+## 📝 Clase 43 - Modificando entidades y autenticando provider 🔒 🔑🔑
+
+- En CustomerEntity se agrega 
+```java
+
+@OneToMany(fetch = FetchType.EAGER)
+@JoinColumn(name = "id_customer")
+private List<RoleEntity> roles;
+```
+
+- Se crea clase RoleEntity -> esta es la hija de CustomerEntity
+
+```java
+@Entity
+@Table(name = "roles")
+@Data
+public class RoleEntity {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private BigInteger id;
+    @Column(name = "role_name")
+    private String name;
+    private String description;
+}
+
+```
+
+- En MyAuthenticationProvider se agrega:
+
+![img](/img/img_21.png)
