@@ -535,3 +535,15 @@ Esto significa: **ejecutar `CsrfCookieFilter` inmediatamente después de `BasicA
 ![img](../img/img_23.png)
 
 ---
+
+## 📝 Clase 45 - AGREGANDO ROLES A LA BASE DE DATOS 👤👤 🔑🔑
+
+- Se agregan roles a la base de datos cambiamos en requestMatchers
+
+![img](../img/img_24.png)
+
+- Tambien en la base de datos hacemos un cambio
+
+![img](../img/img_25.png)
+
+- SPRINGBOOT TIENE UN PREFIJO LLAMADO ROLE_ PARA LOS ROLES

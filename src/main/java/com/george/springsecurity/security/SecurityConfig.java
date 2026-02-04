@@ -19,6 +19,7 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import java.util.List;
 
 @Configuration
+//@EnabledMethodSecurity
 public class SecurityConfig {
 
     @Bean
@@ -28,10 +29,10 @@ public class SecurityConfig {
         http.authorizeHttpRequests(auth ->
                         //auth.requestMatchers("/loans", "/balance", "/accounts", "/cards")
                         auth
-                                .requestMatchers("/loans").hasAuthority("VIEW_LOANS")
-                                .requestMatchers("/balance").hasAuthority("VIEW_BALANCE")
-                                .requestMatchers("/cards").hasAuthority("VIEW_CARDS")
-                                .requestMatchers("/accounts").hasAnyAuthority("VIEW_ACCOUNT","VIEW_CARDS")
+                                .requestMatchers("/loans").hasRole("VIEW_LOANS")
+                                .requestMatchers("/balance").hasRole("VIEW_BALANCE")
+                                .requestMatchers("/cards").hasRole("VIEW_CARDS")
+                                .requestMatchers("/accounts").hasAnyRole("VIEW_ACCOUNT","VIEW_CARDS")
                                 .anyRequest()
                                 .permitAll())
                 .formLogin(Customizer.withDefaults())
