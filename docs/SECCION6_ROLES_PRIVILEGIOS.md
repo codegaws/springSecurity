@@ -378,3 +378,160 @@ Frontend → SecurityFilterChain → CORS → CSRF Filter → AuthenticationProv
 ---
 
 ## 📝 Clase 44 - CONFIGURANDO PRIVILEGIOS 🔒 🔒 🔑🔑
+
+- se agrega hasAuthority en SecurityConfig 
+
+![img](../img/img_22.png)
+
+
+### Explicacion adicional :
+
+## Diferencia entre `authorizeHttpRequests` y `MyAuthenticationProvider`
+
+Son **dos cosas completamente diferentes** que trabajan juntas:
+
+| Componente | Función | Pregunta que responde |
+|------------|---------|----------------------|
+| `authorizeHttpRequests` | **Autorización** | ¿Este usuario PUEDE acceder a este recurso? |
+| `MyAuthenticationProvider` | **Autenticación** | ¿Este usuario ES QUIEN DICE SER? |
+
+## Flujo completo
+
+```
+Usuario envía email + password
+              ↓
+    ┌─────────────────────────────────┐
+    │   MyAuthenticationProvider      │  ← AUTENTICACIÓN
+    │   - Busca usuario en BD         │
+    │   - Valida contraseña           │
+    │   - Carga roles/permisos        │
+    └─────────────────────────────────┘
+              ↓Usuario autenticado ✓
+              ↓
+    Usuario intenta acceder a /loans
+              ↓
+    ┌─────────────────────────────────┐
+    │   authorizeHttpRequests         │  ← AUTORIZACIÓN
+    │   - ¿Tiene VIEW_LOANS?          │
+    │   - SÍ → Acceso permitido       │
+    │   - NO → Error 403 Forbidden    │
+    └─────────────────────────────────┘
+```
+
+## ¿Quién llama a `MyAuthenticationProvider`?
+
+Spring Security lo detecta automáticamente porque:
+
+1. Tiene `@Component` → Spring lo registra como bean
+2. Implementa `AuthenticationProvider` → Spring Security lo usa
+
+```
+formLogin() o httpBasic()
+        ↓
+AuthenticationManager (interno de Spring)
+        ↓
+Busca todos los AuthenticationProvider disponibles
+        ↓
+Llama a MyAuthenticationProvider.authenticate()
+```
+
+## ¿Es necesario `MyAuthenticationProvider`?
+
+**SÍ, es necesario** porque:
+
+- Sin él, Spring no sabe **cómo** verificar las credenciales contra tu base de datos
+- `authorizeHttpRequests` solo verifica permisos **después** de que el usuario ya está autenticado
+
+## Resumen
+
+```
+MyAuthenticationProvider  →  "¿Eres tú?" (verifica email/password)
+authorizeHttpRequests     →  "¿Puedes hacer esto?" (verifica permisos)
+```
+
+**Ambos son necesarios**. Uno no reemplaza al otro.
+
+---
+## `CsrfCookieFilter` - Dónde entra en el flujo
+
+Este filtro se ejecuta **después de la autenticación pero antes de la autorización**.
+
+### Posición en el flujo
+
+```
+Usuario envía credenciales
+              ↓
+    ┌─────────────────────────────────┐
+    │   1. CORS Filter                │
+    └─────────────────────────────────┘
+              ↓
+    ┌─────────────────────────────────┐
+    │   2. CSRF Filter (validación)   │
+    └─────────────────────────────────┘
+              ↓
+    ┌─────────────────────────────────┐
+    │   3. BasicAuthenticationFilter  │  ← Autenticación HTTP Basic
+    │      (llama a MyAuthProvider)   │
+    └─────────────────────────────────┘
+              ↓
+    ┌─────────────────────────────────┐
+    │   4. CsrfCookieFilter ⭐         │  ← TU FILTRO AQUÍ
+    │   (expone token en response)    │
+    └─────────────────────────────────┘
+              ↓
+    ┌─────────────────────────────────┐
+    │   5. authorizeHttpRequests      │  ← Autorización
+    └─────────────────────────────────┘
+              ↓
+          Controlador
+```
+
+### ¿Por qué se ubica ahí?
+
+En tu `SecurityConfig`:
+
+```java
+.addFilterAfter(new CsrfCookieFilter(), BasicAuthenticationFilter.class)
+```
+
+Esto significa: **ejecutar `CsrfCookieFilter` inmediatamente después de `BasicAuthenticationFilter`**.
+
+### ¿Qué hace exactamente?
+
+| Paso | Acción |
+|------|--------|
+| 1 | Obtiene el token CSRF del request |
+| 2 | Lo agrega al **header de la respuesta** |
+| 3 | El frontend puede leerlo para futuras peticiones |
+
+### Flujo visual del token CSRF
+
+```
+┌──────────────────────────────────────────────────────────┐
+│  Request llega con cookie XSRF-TOKEN                     │
+│                      ↓                                   │
+│  Spring extrae token → request.getAttribute()            │
+│                      ↓                                   │
+│  CsrfCookieFilter lo copia al HEADER de respuesta        │
+│  response.setHeader("X-CSRF-TOKEN", token)               │
+│                      ↓                                   │
+│  Frontend lee el header y lo usa en próximas peticiones  │
+└──────────────────────────────────────────────────────────┘
+```
+
+### Resumen del orden completo
+
+| Orden | Componente | Propósito |
+|-------|------------|-----------|
+| 1º | CORS | ¿Origen permitido? |
+| 2º | CSRF | ¿Token CSRF válido? |
+| 3º | BasicAuthFilter + **MyAuthenticationProvider** | ¿Credenciales correctas? (Autenticación) |
+| 4º | **CsrfCookieFilter** | Exponer token CSRF en response |
+| 5º | authorizeHttpRequests | ¿Tiene permisos? (Autorización) |
+| 6º | Controlador | Procesar petición |
+
+**Tu filtro actúa como un "puente" que facilita al frontend obtener el token CSRF para usarlo en peticiones POST/PUT/DELETE.**
+
+![img](../img/img_23.png)
+
+---

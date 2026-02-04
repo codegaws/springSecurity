@@ -31,7 +31,7 @@ public class SecurityConfig {
                                 .requestMatchers("/loans").hasAuthority("VIEW_LOANS")
                                 .requestMatchers("/balance").hasAuthority("VIEW_BALANCE")
                                 .requestMatchers("/cards").hasAuthority("VIEW_CARDS")
-                                .requestMatchers("/accounts").hasAuthority("VIEW_ACCOUNT")
+                                .requestMatchers("/accounts").hasAnyAuthority("VIEW_ACCOUNT","VIEW_CARDS")
                                 .anyRequest()
                                 .permitAll())
                 .formLogin(Customizer.withDefaults())
