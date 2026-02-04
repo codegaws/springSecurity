@@ -547,3 +547,7 @@ Esto significa: **ejecutar `CsrfCookieFilter` inmediatamente después de `BasicA
 ![img](../img/img_25.png)
 
 - SPRINGBOOT TIENE UN PREFIJO LLAMADO ROLE_ PARA LOS ROLES
+
+## 📝 Clase 46 - CONFIGURANDO ROLES👤👤 🔑🔑
+
+![img](../img/img_26.png)
