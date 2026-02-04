@@ -551,3 +551,29 @@ Esto significa: **ejecutar `CsrfCookieFilter` inmediatamente después de `BasicA
 ## 📝 Clase 46 - CONFIGURANDO ROLES👤👤 🔑🔑
 
 ![img](../img/img_26.png)
+
+## 📝 Clase 47 - EXTRA METHOD LEVEL SECURITY👤👤 🔑🔑
+
+- Para poder usar directamente en el controller @PreAuthorize se debe agregar en la clase SecurityConfig EnableMethodSecurity
+- si no va a funcionar. entonces tenemos dos formas de proteger los endpoints una es en SecurityConfig y otra es en el controller con @PreAuthorize
+
+#### FORMA 1 en SecurityConfig
+
+![img](../img/img_27.png)
+
+#### FORMA 2 en AccountsController : 
+
+```JAVA
+@RestController
+@RequestMapping("/accounts")
+public class AccountsController {
+
+    @PreAuthorize("hasAnyAuthority('VIEW_ACCOUNT','VIEW_CARDS')")
+    @GetMapping
+    public Map<String, String> accounts() {
+        //business logic
+        return Collections.singletonMap("msj", "accounts");
+    }
+}
+```
+

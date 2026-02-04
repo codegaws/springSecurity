@@ -3,6 +3,7 @@ package com.george.springsecurity.security;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.Customizer;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -19,7 +20,7 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import java.util.List;
 
 @Configuration
-//@EnabledMethodSecurity
+@EnableMethodSecurity
 public class SecurityConfig {
 
     @Bean
@@ -29,8 +30,10 @@ public class SecurityConfig {
         http.authorizeHttpRequests(auth ->
                         //auth.requestMatchers("/loans", "/balance", "/accounts", "/cards")
                         auth
-                                .requestMatchers("/loans", "/balance").hasRole("USER")
-                                .requestMatchers("/accounts", "/cards").hasRole("ADMIN")
+                                .requestMatchers("/loans").hasAuthority("VIEW_LOANS")
+                                .requestMatchers("/balance").hasAuthority("VIEW_BALANCE")
+                                .requestMatchers("/cards").hasAuthority("VIEW_CARDS")
+                                //.requestMatchers("/accounts").hasAnyAuthority("VIEW_ACCOUNT","VIEW_CARDS")
                                 .anyRequest()
                                 .permitAll())
                 .formLogin(Customizer.withDefaults())

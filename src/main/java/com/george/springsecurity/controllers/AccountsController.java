@@ -12,7 +12,7 @@ import java.util.Map;
 @RequestMapping("/accounts")
 public class AccountsController {
 
-    //@PreAuthorize("hasAnyAuthority('VIEW_ACCOUNT','VIEW_CARDS')")
+    @PreAuthorize("hasAnyAuthority('VIEW_ACCOUNT','VIEW_CARDS')")
     @GetMapping
     public Map<String, String> accounts() {
         //business logic
