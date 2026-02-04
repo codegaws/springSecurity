@@ -13,7 +13,7 @@ public class WelcomeController {
 
     @GetMapping
     public Map<String, String> welcome() {
-        return Collections.singletonMap("message", "Welcome to Spring Security!");
+        return Collections.singletonMap("msj", "Welcome to Spring Security!");
     }
 
 }

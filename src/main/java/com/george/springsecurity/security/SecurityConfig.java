@@ -26,8 +26,12 @@ public class SecurityConfig {
         var requestHandler = new CsrfTokenRequestAttributeHandler();
         requestHandler.setCsrfRequestAttributeName("_csrf");//-> Resumen: Es básicamente un "alias" o "nombre de variable" para que tanto backend como frontend sepan cómo referirse al token CSRF. con el que vamos a trabajar en el front end por convencion se usa _csrf
         http.authorizeHttpRequests(auth ->
-                        auth.requestMatchers("/loans", "/balance", "/accounts", "/cards")
-                                .authenticated()
+                        //auth.requestMatchers("/loans", "/balance", "/accounts", "/cards")
+                        auth
+                                .requestMatchers("/loans").hasAuthority("VIEW_LOANS")
+                                .requestMatchers("/balance").hasAuthority("VIEW_BALANCE")
+                                .requestMatchers("/cards").hasAuthority("VIEW_CARDS")
+                                .requestMatchers("/accounts").hasAuthority("VIEW_ACCOUNT")
                                 .anyRequest()
                                 .permitAll())
                 .formLogin(Customizer.withDefaults())
