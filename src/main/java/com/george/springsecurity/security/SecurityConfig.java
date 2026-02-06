@@ -25,6 +25,7 @@ public class SecurityConfig {
 
     @Bean
     SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        http.addFilterBefore(new ApiKeyFilter(), BasicAuthenticationFilter.class);
         var requestHandler = new CsrfTokenRequestAttributeHandler();
         requestHandler.setCsrfRequestAttributeName("_csrf");//-> Resumen: Es básicamente un "alias" o "nombre de variable" para que tanto backend como frontend sepan cómo referirse al token CSRF. con el que vamos a trabajar en el front end por convencion se usa _csrf
         http.authorizeHttpRequests(auth ->

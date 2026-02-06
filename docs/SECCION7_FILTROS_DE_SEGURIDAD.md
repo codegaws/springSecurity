@@ -76,4 +76,180 @@ Security filter chain: [
   AnonymousAuthenticationFilter
   ExceptionTranslationFilter
   AuthorizationFilter
-]```
+
+```
+---
+
+## 📝 Clase 51 - IMPLEMENTANDO UN FILTRO PARA IMPLEMENTAR UN APIKEY🔒 🔒 🔑🔑
+### 🔐 Explicación del Flujo de Filtros en Spring Security
+
+- En security config
+```java
+@Configuration
+@EnableMethodSecurity
+public class SecurityConfig {
+
+    @Bean
+    SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        http.addFilterBefore(new ApiKeyFilter(), BasicAuthenticationFilter.class);
+```
+-En ApiKeyFilter 
+
+```java
+
+public class ApiKeyFilter extends OncePerRequestFilter {
+
+    private static final String API_KEY = "myKey";
+    private static final String API_KEY_HEADER = "api_key";
+
+    @Override
+    protected void doFilterInternal(HttpServletRequest request,
+                                    HttpServletResponse response,
+                                    FilterChain filterChain) throws ServletException, IOException {
+        try {
+            final var apiKeyOpt = Optional.of(request.getHeader(API_KEY_HEADER));
+            final var apiKey = apiKeyOpt.orElseThrow(() -> new BadCredentialsException("Not Header api key"));
+            if (!apiKey.equals(API_KEY)) {
+                throw new BadCredentialsException("Invalid api key");
+            }
+        } catch (Exception e) {
+            throw new BadCredentialsException("Invalid api key");
+        }
+        filterChain.doFilter(request, response);
+    }
+}
+```
+
+---
+
+#### 📋 ¿Qué es un Filtro en Spring Security?
+
+Un **filtro** es un componente que intercepta las peticiones HTTP **antes** de que lleguen a los controladores. Spring Security usa una **cadena de filtros** para aplicar seguridad.
+
+---
+
+#### 🔄 Flujo Completo de una Petición
+
+```
+Cliente (Browser/Postman)
+│
+▼
+┌─────────────┐
+│   Request   │  GET /loans + Header: api_key=myKey
+└─────────────┘
+│
+▼
+┌─────────────────────────────────────────┐
+│      SPRING SECURITY FILTER CHAIN       │
+├─────────────────────────────────────────┤
+│  1. 🔑 ApiKeyFilter (TU FILTRO)         │ ◄── addFilterBefore()
+│  2. 🔒 BasicAuthenticationFilter        │
+│  3. 🛡️ CsrfFilter                       │
+│  4. 📝 Otros filtros...                 │
+└─────────────────────────────────────────┘
+│
+▼
+┌─────────────┐
+│ Controller  │  @GetMapping("/loans")
+└─────────────┘
+│
+▼
+┌─────────────┐
+│  Response   │
+└─────────────┘
+```
+
+---
+
+#### 🧩 ¿Qué hace `addFilterBefore()`?
+
+```java
+http.addFilterBefore(new ApiKeyFilter(), BasicAuthenticationFilter.class);
+```
+
+| Parte | Significado |
+|-------|-------------|
+| `addFilterBefore` | Agrega un filtro **antes** de otro filtro existente |
+| `new ApiKeyFilter()` | Tu filtro personalizado que valida la API Key |
+| `BasicAuthenticationFilter.class` | El filtro de referencia (tu filtro se ejecuta **antes** de este) |
+
+---
+
+#### ⚙️ ¿Cómo funciona `ApiKeyFilter`?
+
+```java
+public class ApiKeyFilter extends OncePerRequestFilter
+```
+
+| Componente | Descripción |
+|------------|-------------|
+| `OncePerRequestFilter` | 🔁 Garantiza que el filtro se ejecute **solo una vez** por petición |
+| `doFilterInternal()` | 🎯 Método donde va tu lógica de validación |
+
+---
+
+#### 🔍 Flujo dentro de `ApiKeyFilter`
+
+```
+Petición entrante
+       │
+       ▼
+┌──────────────────────────────────┐
+│ 1. Obtener header "api_key"      │
+│    request.getHeader("api_key")  │
+└──────────────────────────────────┘
+       │
+       ▼
+┌──────────────────────────────────┐
+│ 2. ¿Existe el header?            │
+│    ❌ NO → BadCredentialsException│
+│    ✅ SÍ → Continúa               │
+└──────────────────────────────────┘
+       │
+       ▼
+┌──────────────────────────────────┐
+│ 3. ¿apiKey == "myKey"?           │
+│    ❌ NO → BadCredentialsException│
+│    ✅ SÍ → Continúa               │
+└──────────────────────────────────┘
+       │
+       ▼
+┌──────────────────────────────────┐
+│ 4. filterChain.doFilter()        │
+│    → Pasa al siguiente filtro    │
+└──────────────────────────────────┘
+```
+
+---
+
+#### 📊 Ejemplo Práctico
+
+| Escenario | Header Enviado | Resultado |
+|-----------|----------------|-----------|
+| ✅ Válido | `api_key: myKey` | Continúa al controller |
+| ❌ Key incorrecta | `api_key: wrongKey` | `401 Unauthorized` |
+| ❌ Sin header | (ninguno) | `401 Unauthorized` |
+
+---
+
+#### 🎯 Resumen Visual
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                    ORDEN DE EJECUCIÓN                   │
+├─────────────────────────────────────────────────────────┤
+│                                                         │
+│   Request → [ApiKeyFilter] → [BasicAuth] → Controller  │
+│                  ▲                                      │
+│                  │                                      │
+│         Tu filtro va PRIMERO                           │
+│         gracias a addFilterBefore()                    │
+│                                                         │
+└─────────────────────────────────────────────────────────┘
+```
+
+---
+
+#### 💡 Punto Clave
+
+`filterChain.doFilter(request, response)` es **crucial**: si no lo llamas, la petición **nunca** llegará al siguiente filtro ni al controller.
