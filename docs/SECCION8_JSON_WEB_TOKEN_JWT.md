@@ -153,3 +153,33 @@ JWT = Header + Payload + Signature
 ---
 
 ![img](img/img_35.png)
+
+---
+## 📝 Clase 54 - AÑADIENDO LIBRERIAS PARA TRABAJAR CON JWT 👤👤️‍♂🕵️‍♂🔑 🔑 
+- Se agregan 3 dependencias para trabajar con JWT en Spring Boot, todas de la biblioteca `io.jsonwebtoken` (JJWT):
+
+```xml
+   <!-- Source: https://mvnrepository.com/artifact/io.jsonwebtoken/jjwt-jackson -->
+        <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-jackson</artifactId>
+            <version>0.11.5</version>
+            <scope>runtime</scope>
+        </dependency>
+
+        <!-- Source: https://mvnrepository.com/artifact/io.jsonwebtoken/jjwt-impl -->
+        <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-impl</artifactId>
+            <version>0.11.5</version>
+            <scope>runtime</scope>
+        </dependency>
+
+        <!-- Source: https://mvnrepository.com/artifact/io.jsonwebtoken/jjwt-api -->
+        <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-api</artifactId>
+            <version>0.11.5</version>
+        </dependency>
+        
+   ```
