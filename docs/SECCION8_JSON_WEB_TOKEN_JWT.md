@@ -185,4 +185,317 @@ JWT = Header + Payload + Signature
    ```
 
 ## 📝 Clase 55 -JWT USER DETAILS 👤👤️‍♂🕵️‍♂🔑 🔑 
+- Creamos un JwtUserDetailService que implementa UserDetailsService para cargar los detalles del usuario desde la base de datos y convertirlos en un objeto UserDetails que Spring Security pueda usar para la autenticación y autorización basada en JWT.
+
+```java
+@Service
+@AllArgsConstructor
+public class JwtUserDetailService implements UserDetailsService {
+
+    private final CustomerRepository customerRepository;
+
+    @Override
+    public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
+        return this.customerRepository.findByEmail(username)
+                .map(customer -> {
+                    final var authorities = customer.getRoles()
+                            .stream()
+                            .map(role -> new SimpleGrantedAuthority(role.getName()))
+                            .toList();
+                    return new User(customer.getEmail(), customer.getPassword(), authorities);
+                }).orElseThrow(() -> new UsernameNotFoundException("User not exists"));
+        
+    }
+}
+
+
+```
+### ✅ Explicación del método `loadUserByUsername`Este método busca un usuario por su email y lo transforma en un `UserDetails` que Spring Security entiende.
+
+---
+
+#### 🧭 Flujo general1. 🔎 Busca el cliente por email en el repositorio.2. 🧩 Si existe, convierte sus roles en `GrantedAuthority`.3. 👤 Crea un objeto `User` de Spring Security.4. ❌ Si no existe, lanza una excepción.
+
+---
+
+### 🔁 ¿Qué transforman los dos `map`?
+
+| Lugar | `map` | Entrada | Salida |
+|---|---|---|---|
+| `Optional.map(...)` | Optional | `Customer` | `UserDetails` |
+| `Stream.map(...)` | Stream | `Role` | `SimpleGrantedAuthority` |
+
+---
+
+### 🧠 Detalle de cada `map`
+
+####1️⃣ `Optional.map(...)`✅ **Transforma un `Customer` en un `UserDetails`**Se ejecuta solo si el cliente existe.
+
+---
+
+####2️⃣ `Stream.map(...)`✅ **Transforma cada `Role` en `SimpleGrantedAuthority`**Se usa para crear la lista de permisos que necesita Spring Security.
+
+---
+
+### 📌 Ejemplo conceptual (mismo escenario)
+- Email: `alice@mail.com`- Roles: `ROLE_USER`, `ROLE_ADMIN`**Resultado final**:Un `UserDetails` con email, contraseña cifrada y dos autoridades.
+
+---
+# 🔐 Explicación Detallada: `JwtUserDetailService`
+
+---
+
+## 🎯 ¿Qué hace este servicio?
+
+Este servicio actúa como **puente** entre tu base de datos y Spring Security. Busca un usuario por email y lo convierte en un formato que Spring Security entiende (`UserDetails`).
+
+---
+
+## 🧩 Anatomía del Método `loadUserByUsername`
+
+```java
+@Override
+public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
+    return this.customerRepository.findByEmail(username)  // 1️⃣
+            .map(customer -> {                             // 2️⃣
+                final var authorities = customer.getRoles()
+                        .stream()                          // 3️⃣
+                        .map(role -> new SimpleGrantedAuthority(role.getName())) // 4️⃣
+                        .toList();
+                return new User(customer.getEmail(), customer.getPassword(), authorities); // 5️⃣
+            }).orElseThrow(() -> new UsernameNotFoundException("User not exists")); // 6️⃣
+}
+```
+
+---
+
+## 🔍 Análisis Paso a Paso
+
+| Paso | Código | ¿Qué hace? |
+|------|--------|------------|
+| **1️⃣** | `findByEmail(username)` | 🔎 Busca en la BD un cliente con ese email |
+| **2️⃣** | `Optional.map(customer -> {...})` | 🔄 Si existe, transforma `Customer` → `UserDetails` |
+| **3️⃣** | `customer.getRoles().stream()` | 📋 Convierte la lista de roles en un Stream |
+| **4️⃣** | `.map(role -> new SimpleGrantedAuthority(...))` | 🔐 Transforma cada `Role` → `SimpleGrantedAuthority` |
+| **5️⃣** | `new User(email, password, authorities)` | 👤 Crea el objeto `UserDetails` de Spring Security |
+| **6️⃣** | `.orElseThrow(...)` | ❌ Si no existe, lanza excepción |
+
+---
+
+## 🎭 Los Dos `map()`: ¿Qué Transforman?
+
+### 📦 **MAP #1: `Optional.map()`** → Transforma el Contenedor
+
+```java
+Optional<Customer> ---> Optional<UserDetails>
+```
+
+| **Antes del map** | **Después del map** |
+|-------------------|---------------------|
+| `Optional<Customer>` | `Optional<UserDetails>` |
+| Objeto de tu BD | Objeto que Spring Security entiende |
+
+#### 🧪 Ejemplo con tu escenario:
+
+```java
+// ANTES del map:
+Optional<Customer> cliente = Optional.of(
+    new Customer("alice@mail.com", "$2a$10...", [ROLE_USER, ROLE_ADMIN])
+)
+
+// DESPUÉS del map:
+Optional<UserDetails> usuario = Optional.of(
+    new User("alice@mail.com", "$2a$10...", [SimpleGrantedAuthority("ROLE_USER"), ...])
+)
+```
+
+---
+
+### 📋 **MAP #2: `Stream.map()`** → Transforma Cada Elemento
+
+```java
+Stream<Role> ---> Stream<SimpleGrantedAuthority>
+```
+
+| **Antes del map** | **Después del map** |
+|-------------------|---------------------|
+| `Stream<Role>` | `Stream<SimpleGrantedAuthority>` |
+| Tus entidades de BD | Autoridades de Spring Security |
+
+#### 🧪 Ejemplo con tu escenario:
+
+```java
+// ANTES del map:
+Stream<Role> roles = Stream.of(
+    new Role("ROLE_USER"),
+    new Role("ROLE_ADMIN")
+)
+
+// DESPUÉS del map:
+Stream<SimpleGrantedAuthority> authorities = Stream.of(
+    new SimpleGrantedAuthority("ROLE_USER"),
+    new SimpleGrantedAuthority("ROLE_ADMIN")
+)
+```
+
+---
+
+## 🎨 Diagrama de Flujo Completo
+
+```
+📧 Email: "alice@mail.com"
+        │
+        ▼
+   🔍 customerRepository.findByEmail()
+        │
+        ├─── ✅ ENCONTRADO
+        │         │
+        │         ▼│    📦 Optional<Customer>
+        │         │
+        │         ▼ (Optional.map)
+        │    🔄 Transformación
+        │         │
+        │         ├─── 📋 getRoles() → [Role, Role, ...]
+        │         │         │
+        │         │         ▼ (Stream.map)
+        │         │    🔐 [SimpleGrantedAuthority, ...]
+        │         │
+        │         ▼
+        │    👤 new User(email, password, authorities)
+        │         │
+        │         ▼
+        │    ✅ UserDetails
+        │
+        └─── ❌ NO ENCONTRADO
+                  │
+                  ▼🚫 UsernameNotFoundException
+```
+
+---
+
+## 🧮 Ejemplo Completo con Datos Reales
+
+### 🗄️ **Datos en la Base de Datos:**
+
+```
+CUSTOMER TABLE:
++----+------------------+-----------------+
+| id | email            | password        |
++----+------------------+-----------------+
+| 1  | alice@mail.com   | $2a$10abc...    |
++----+------------------+-----------------+
+
+ROLE TABLE:
++----+-------------+
+| id | name        |
++----+-------------+
+| 1  | ROLE_USER   |
+| 2  | ROLE_ADMIN  |
++----+-------------+
+
+CUSTOMER_ROLES:
++-------------+---------+
+| customer_id | role_id |
++-------------+---------+
+| 1           | 1       |
+| 1           | 2       |
++-------------+---------+
+```
+
+### 🔄 **Proceso de Transformación:**
+
+```java
+// 1️⃣ findByEmail("alice@mail.com") retorna:
+Optional<Customer> {
+    email: "alice@mail.com",
+    password: "$2a$10abc...",
+    roles: [
+        Role{name: "ROLE_USER"},
+        Role{name: "ROLE_ADMIN"}
+    ]
+}
+
+// 2️⃣ Stream.map() transforma roles:
+[Role{ROLE_USER}, Role{ROLE_ADMIN}]
+           ↓
+[SimpleGrantedAuthority("ROLE_USER"), SimpleGrantedAuthority("ROLE_ADMIN")]
+
+// 3️⃣ Optional.map() crea UserDetails:
+User {
+    username: "alice@mail.com",
+    password: "$2a$10abc...",
+    authorities: [
+        SimpleGrantedAuthority("ROLE_USER"),
+        SimpleGrantedAuthority("ROLE_ADMIN")
+    ],
+    enabled: true,
+    accountNonExpired: true,
+    credentialsNonExpired: true,
+    accountNonLocked: true
+}
+```
+
+---
+
+## 💡 Conceptos Clave para Entender `map()`
+
+### 🎯 **`Optional.map()`**
+- **No modifica** el Optional original
+- **Solo se ejecuta** si el Optional contiene un valor
+- **Retorna** un nuevo Optional con el valor transformado
+
+### 🎯 **`Stream.map()`**
+- **Transforma cada elemento** del Stream
+- **Es una operación intermedia** (lazy)
+- **No modifica** la colección original
+
+---
+
+## 📚 Métodos Relacionados que Podrías Necesitar
+
+| Método | ¿Cuándo usarlo? | Ejemplo |
+|--------|-----------------|---------|
+| `Optional.flatMap()` | Cuando la función retorna otro Optional | `.flatMap(c -> repository.findAddress(c))` |
+| `Optional.orElse()` | Valor por defecto si está vacío | `.orElse(guestUser)` |
+| `Optional.ifPresent()` | Ejecutar acción solo si existe | `.ifPresent(user -> log.info(user))` |
+| `Stream.filter()` | Filtrar elementos antes de transformar | `.filter(role -> role.isActive())` |
+| `Stream.collect()` | Convertir Stream a colección | `.collect(Collectors.toSet())` |
+
+---
+
+## 🎓 Resumen para Estudiantes
+
+### ✅ **Lo que DEBES recordar:**
+
+```
+🔑 loadUserByUsername() hace 3 cosas:
+   1. Busca usuario por email (BD → Optional<Customer>)
+   2. Transforma roles (Role → SimpleGrantedAuthority)
+   3. Crea UserDetails (Customer → User)
+
+🔄 Dos transformaciones map():
+   - Optional.map() → cambia el tipo del contenedor
+   - Stream.map() → cambia cada elemento de la colección
+
+❌ Si no existe usuario → lanza UsernameNotFoundException
+```
+
+---
+
+## 🚀 Mejora Adicional (Bonus)
+
+Si quisieras agregar **más información al token JWT** (como nombre completo), podrías extender así:
+
+```java
+return new User(
+    customer.getEmail(),
+    customer.getPassword(),
+    authorities
+) {
+    @Override
+    public String toString() {
+        return customer.getFullName() + " (" + customer.getEmail() + ")";
+    }
+};
+```
 
