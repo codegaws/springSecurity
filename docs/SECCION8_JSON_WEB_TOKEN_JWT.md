@@ -2459,6 +2459,8 @@ public class AuthorizationService {
 ✅ Claims::getExpiration = Method Reference (forma corta)
 ✅ Patrón: Un método genérico + varios de conveniencia
 ```
+
+## 📝 Clase 58 - Configurando el tiempo de caducidad a nuestro JWT 👤👤🕵️‍♂🕵️‍♂🔑 🔑 
 # 🔐 Explicación de Métodos de Validación JWT
 
 ---
@@ -2868,5 +2870,566 @@ Capa 2: ¿El token aún es VÁLIDO temporalmente?
 
 Ambas deben ser TRUE para autorizar la petición
 ```
+## 📝 Clase 59 - Finalizando la configuracion de nuestro JWT 👤👤🕵️‍♂🕵️‍♂🔑 🔑 
 
-## 📝 Clase 58 - Configurando el tiempo de caducidad a nuestro JWT 👤👤🕵️‍♂🕵️‍♂🔑 🔑 
+
+- En JWTService agregamos esto -> 
+
+```java
+ public String generateToken(UserDetails userDetails) {
+        final Map<String, Object> claims = Collections.singletonMap("ROLES", userDetails.getAuthorities().toString());
+        return this.getToken(claims, userDetails.getUsername());
+    }
+
+    private String getToken(Map<String, Object> claims, String subject) {
+        final var key = Keys.hmacShaKeyFor(JWT_SECRET.getBytes(StandardCharsets.UTF_8));
+        return Jwts
+                .builder()
+                .setClaims(claims)
+                .setSubject(subject)
+                .setIssuedAt(new Date(System.currentTimeMillis()))
+                .setExpiration(new Date(System.currentTimeMillis() + JWT_TOKEN_VALIDITY * 1000))
+                .signWith(key)
+                .compact();
+    }
+```
+# 🔨 Generación de Tokens JWT - Explicación Completa
+
+---
+
+## 📋 Visión General
+
+Estos dos métodos trabajan juntos para **crear** un token JWT firmado que contiene información del usuario autenticado.
+
+---
+
+## 🎯 ¿Qué Devuelven?
+
+### 📦 **Retorno: String (Token JWT)**
+
+Ambos métodos devuelven un **String** que representa un **token JWT firmado**.
+
+```
+Ejemplo de token generado:
+eyJhbGciOiJIUzI1NiJ9.eyJST0xFUyI6IltST0xFX1VTRVIsIFJPTEVfQURNSU5dIiwic3ViIjoiYWxpY2VAbWFpbC5jb20iLCJpYXQiOjE3MDUzMTg4MDAsImV4cCI6MTcwNTMzNjgwMH0.X7fK9mP3nQ8uR2vL5wE6yT4hJ1sA0bN9cM8dO6pI3gH
+```
+
+---
+
+## 1️⃣ `generateToken()` - Método Público
+
+### 🎯 **Propósito**
+Punto de entrada para generar un token JWT a partir de un `UserDetails`.
+
+### 💻 **Código**
+```java
+public String generateToken(UserDetails userDetails) {
+    final Map<String, Object> claims = Collections.singletonMap("ROLES", userDetails.getAuthorities().toString());
+    return this.getToken(claims, userDetails.getUsername());
+}
+```
+
+### 🔍 **¿Qué Hace Paso a Paso?**
+
+```
+1️⃣ Extrae las autoridades del usuario
+   userDetails.getAuthorities()
+   → [SimpleGrantedAuthority("ROLE_USER"), SimpleGrantedAuthority("ROLE_ADMIN")]
+
+2️⃣ Convierte a String
+   .toString()
+   → "[ROLE_USER, ROLE_ADMIN]"
+
+3️⃣ Crea un Map con los claims personalizados
+   Collections.singletonMap("ROLES", "[ROLE_USER, ROLE_ADMIN]")
+   → Map con UNA entrada: key="ROLES", value="[ROLE_USER, ROLE_ADMIN]"
+
+4️⃣ Extrae el username
+   userDetails.getUsername()
+   → "alice@mail.com"
+
+5️⃣ Llama a getToken() con los datos preparados
+   getToken(claims, "alice@mail.com")
+```
+
+### 📊 **Transformación de Datos**
+
+```
+┌──────────────────────────────────────────┐
+│         UserDetails (Entrada)            │
+│                                          │
+│  username: "alice@mail.com"              │
+│  password: "$2a$10abc..."                │
+│  authorities: [                          │
+│    SimpleGrantedAuthority("ROLE_USER"),  │
+│    SimpleGrantedAuthority("ROLE_ADMIN")  │
+│  ]                                       │
+└──────────────────────────────────────────┘
+                   ↓ generateToken()
+┌──────────────────────────────────────────┐
+│           Datos Extraídos                │
+│                                          │
+│  claims: {                               │
+│    "ROLES": "[ROLE_USER, ROLE_ADMIN]"    │
+│  }                                       │
+│                                          │
+│  subject: "alice@mail.com"               │
+└──────────────────────────────────────────┘
+                   ↓ getToken()
+┌──────────────────────────────────────────┐
+│         Token JWT (Salida)               │
+│                                          │
+│  "eyJhbGciOiJIUzI1NiJ9..."               │
+└──────────────────────────────────────────┘
+```
+
+---
+
+## 2️⃣ `getToken()` - Método Privado (Constructor Real)
+
+### 🎯 **Propósito**
+Construye y firma el token JWT usando la biblioteca JJWT.
+
+### 💻 **Código**
+```java
+private String getToken(Map<String, Object> claims, String subject) {
+    final var key = Keys.hmacShaKeyFor(JWT_SECRET.getBytes(StandardCharsets.UTF_8));
+    return Jwts
+            .builder()
+            .setClaims(claims)
+            .setSubject(subject)
+            .setIssuedAt(new Date(System.currentTimeMillis()))
+            .setExpiration(new Date(System.currentTimeMillis() + JWT_TOKEN_VALIDITY * 1000))
+            .signWith(key)
+            .compact();
+}
+```
+
+### 🔍 **¿Qué Hace Cada Paso?**
+
+| Paso | Método | Descripción | Valor Ejemplo |
+|------|--------|-------------|---------------|
+| **1️⃣** | `Keys.hmacShaKeyFor()` | Crea la clave de firma HMAC | `SecretKey` object |
+| **2️⃣** | `Jwts.builder()` | Inicia la construcción del JWT | Builder instance |
+| **3️⃣** | `.setClaims(claims)` | Añade claims personalizados | `{"ROLES": "[ROLE_USER, ROLE_ADMIN]"}` |
+| **4️⃣** | `.setSubject(subject)` | Define el "sujeto" (username) | `"alice@mail.com"` |
+| **5️⃣** | `.setIssuedAt(...)` | Fecha de emisión | `2024-01-15 10:00:00` |
+| **6️⃣** | `.setExpiration(...)` | Fecha de expiración | `2024-01-15 15:00:00` (5h después) |
+| **7️⃣** | `.signWith(key)` | Firma el token con la clave | Genera la firma |
+| **8️⃣** | `.compact()` | Serializa a String | Token JWT completo |
+
+---
+
+## 🔐 Cálculo de Expiración
+
+### ⏰ **Fórmula**
+
+```java
+JWT_TOKEN_VALIDITY = 5 * 60 * 60  // 5 horas en segundos
+// = 18000 segundos
+
+setExpiration(new Date(System.currentTimeMillis() + JWT_TOKEN_VALIDITY * 1000))
+//                      │                          │                      │
+//                      └─ Ahora en ms             └─ 18000               └─ Convertir a ms
+//                         1705318800000              segundos              * 1000
+//                                                                          = 18000000 ms
+//                                                                          = 5 horas
+```
+
+### 📅 **Ejemplo Real**
+
+```
+Fecha actual:    2024-01-15 10:00:00  →  1705318800000 ms
++ 5 horas:       18000000 ms
+───────────────────────────────────────────────────────
+Fecha expiración: 2024-01-15 15:00:00  →  1705336800000 ms
+```
+
+---
+
+## 🏗️ Estructura del Token JWT Generado
+
+### 📦 **Anatomía de un JWT**
+
+```
+eyJhbGciOiJIUzI1NiJ9.eyJST0xFUyI6IltST0xFX1VTRVIsIFJPTEVfQURNSU5dIiwic3ViIjoiYWxpY2VAbWFpbC5jb20iLCJpYXQiOjE3MDUzMTg4MDAsImV4cCI6MTcwNTMzNjgwMH0.X7fK9mP3nQ8uR2vL5wE6yT4hJ1sA0bN9cM8dO6pI3gH
+│                      │                                                                                                                                             │                                          │
+└─ HEADER             └─ PAYLOAD                                                                                                                                    └─ SIGNATURE
+   (Base64)              (Base64)                                                                                                                                       (Firma HMAC)
+```
+
+### 🔓 **HEADER (Decodificado)**
+
+```json
+{
+  "alg": "HS256",
+  "typ": "JWT"
+}
+```
+
+### 📋 **PAYLOAD (Decodificado)**
+
+```json
+{
+  "ROLES": "[ROLE_USER, ROLE_ADMIN]",    ← Claim personalizado (setClaims)
+  "sub": "alice@mail.com",                ← Subject (setSubject)
+  "iat": 1705318800,                      ← Issued At (setIssuedAt)
+  "exp": 1705336800                       ← Expiration (setExpiration)
+}
+```
+
+### 🔐 **SIGNATURE (Cómo se genera)**
+
+```
+HMACSHA256(
+  base64UrlEncode(header) + "." + base64UrlEncode(payload),
+  secret
+)
+```
+
+---
+
+## 🔄 Flujo Completo de Generación
+
+```
+┌─────────────────────────────────────────────┐
+│  1️⃣ USUARIO SE AUTENTICA                     │
+│  POST /api/auth/login                       │
+│  Body: {                                    │
+│    "email": "alice@mail.com",               │
+│    "password": "123456"                     │
+│  }                                          │
+└─────────────────────────────────────────────┘
+                    ↓
+┌─────────────────────────────────────────────┐
+│  2️⃣ Spring Security Valida Credenciales     │
+│  AuthenticationManager.authenticate()       │
+│                                             │
+│  ✅ Credenciales correctas                  │
+└─────────────────────────────────────────────┘
+                    ↓
+┌─────────────────────────────────────────────┐
+│  3️⃣ UserDetailsService Carga UserDetails    │
+│  loadUserByUsername("alice@mail.com")       │
+│                                             │
+│  UserDetails {                              │
+│    username: "alice@mail.com"               │
+│    authorities: [ROLE_USER, ROLE_ADMIN]     │
+│  }                                          │
+└─────────────────────────────────────────────┘
+                    ↓
+┌─────────────────────────────────────────────┐
+│  4️⃣ LLAMADA A generateToken()               │
+│  jwtService.generateToken(userDetails)      │
+└─────────────────────────────────────────────┘
+                    ↓
+        ┌───────────────────────────┐
+        │ 4.1 Extraer Authorities   │
+        │                           │
+        │ userDetails.getAuthorities()
+        │ → [SimpleGrantedAuthority("ROLE_USER"),
+        │    SimpleGrantedAuthority("ROLE_ADMIN")]
+        │                           │
+        │ .toString()               │
+        │ → "[ROLE_USER, ROLE_ADMIN]"
+        └───────────────────────────┘
+                    ↓
+        ┌───────────────────────────┐
+        │ 4.2 Crear Map de Claims  │
+        │                           │
+        │ Collections.singletonMap( │
+        │   "ROLES",                │
+        │   "[ROLE_USER, ROLE_ADMIN]"
+        │ )                         │
+        │                           │
+        │ → Map<String, Object> {   │
+        │     "ROLES": "[ROLE_USER, ROLE_ADMIN]"
+        │   }                       │
+        └───────────────────────────┘
+                    ↓
+        ┌───────────────────────────┐
+        │ 4.3 Extraer Username     │
+        │                           │
+        │ userDetails.getUsername() │
+        │ → "alice@mail.com"        │
+        └───────────────────────────┘
+                    ↓
+┌─────────────────────────────────────────────┐
+│  5️⃣ LLAMADA A getToken()                    │
+│  getToken(claims, "alice@mail.com")         │
+└─────────────────────────────────────────────┘
+                    ↓
+        ┌───────────────────────────┐
+        │ 5.1 Crear Clave de Firma │
+        │                           │
+        │ Keys.hmacShaKeyFor(       │
+        │   JWT_SECRET.getBytes()   │
+        │ )                         │
+        │                           │
+        │ Secret: "jxgEQe.XHuPq..." │
+        │ → SecretKey instance      │
+        └───────────────────────────┘
+                    ↓
+        ┌───────────────────────────┐
+        │ 5.2 Construir JWT Builder│
+        │                           │
+        │ Jwts.builder()            │
+        └───────────────────────────┘
+                    ↓
+        ┌───────────────────────────┐
+        │ 5.3 Añadir Claims        │
+        │                           │
+        │ .setClaims({              │
+        │   "ROLES": "[ROLE_USER, ROLE_ADMIN]"
+        │ })                        │
+        └───────────────────────────┘
+                    ↓
+        ┌───────────────────────────┐
+        │ 5.4 Añadir Subject       │
+        │                           │
+        │ .setSubject(              │
+        │   "alice@mail.com"        │
+        │ )                         │
+        └───────────────────────────┘
+                    ↓
+        ┌───────────────────────────┐
+        │ 5.5 Fecha de Emisión     │
+        │                           │
+        │ .setIssuedAt(             │
+        │   new Date(               │
+        │     System.currentTimeMillis()
+        │   )                       │
+        │ )                         │
+        │                           │
+        │ → 2024-01-15 10:00:00     │
+        │   (1705318800000 ms)      │
+        └───────────────────────────┘
+                    ↓
+        ┌───────────────────────────┐
+        │ 5.6 Fecha de Expiración  │
+        │                           │
+        │ .setExpiration(           │
+        │   new Date(               │
+        │     System.currentTimeMillis()
+        │     + 18000 * 1000        │
+        │   )                       │
+        │ )                         │
+        │                           │
+        │ → 2024-01-15 15:00:00     │
+        │   (1705336800000 ms)      │
+        │   [5 horas después]       │
+        └───────────────────────────┘
+                    ↓
+        ┌───────────────────────────┐
+        │ 5.7 Firmar el Token      │
+        │                           │
+        │ .signWith(key)            │
+        │                           │
+        │ HMAC-SHA256(              │
+        │   header + "." + payload, │
+        │   secretKey               │
+        │ )                         │
+        └───────────────────────────┘
+                    ↓
+        ┌───────────────────────────┐
+        │ 5.8 Serializar a String  │
+        │                           │
+        │ .compact()                │
+        │                           │
+        │ Base64(header)            │
+        │ + "."                     │
+        │ + Base64(payload)         │
+        │ + "."                     │
+        │ + signature               │
+        └───────────────────────────┘
+                    ↓
+┌─────────────────────────────────────────────┐
+│  6️⃣ TOKEN JWT GENERADO                      │
+│                                             │
+│  eyJhbGciOiJIUzI1NiJ9.                      │
+│  eyJST0xFUyI6IltST0xFX1VTRVIsIFJPTEVfQURN  │
+│  SU5dIiwic3ViIjoiYWxpY2VAbWFpbC5jb20iLCJp  │
+│  YXQiOjE3MDUzMTg4MDAsImV4cCI6MTcwNTMzNjgw  │
+│  MH0.                                       │
+│  X7fK9mP3nQ8uR2vL5wE6yT4hJ1sA0bN9cM8dO6pI │
+│  3gH                                        │
+└─────────────────────────────────────────────┘
+                    ↓
+┌─────────────────────────────────────────────┐
+│  7️⃣ RETORNAR TOKEN AL CLIENTE               │
+│  Response: {                                │
+│    "token": "eyJhbGciOiJIUzI1NiJ9..."       │
+│  }                                          │
+└─────────────────────────────────────────────┘
+```
+
+---
+
+## 🧪 Ejemplo con Datos Reales
+
+### 📝 **Input (UserDetails)**
+
+```java
+UserDetails userDetails = new User(
+    "alice@mail.com",
+    "$2a$10abc...",
+    List.of(
+        new SimpleGrantedAuthority("ROLE_USER"),
+        new SimpleGrantedAuthority("ROLE_ADMIN")
+    )
+);
+```
+
+### 🔄 **Procesamiento**
+
+```java
+// 1️⃣ generateToken() - Preparar datos
+Map<String, Object> claims = Collections.singletonMap(
+    "ROLES", 
+    "[ROLE_USER, ROLE_ADMIN]"  // toString() de las authorities
+);
+String subject = "alice@mail.com";
+
+// 2️⃣ getToken() - Construir JWT
+SecretKey key = Keys.hmacShaKeyFor(
+    "jxgEQe.XHuPq8VdbyYFNkAN.dudQ0903YUn4".getBytes(StandardCharsets.UTF_8)
+);
+
+String token = Jwts.builder()
+    .setClaims({"ROLES": "[ROLE_USER, ROLE_ADMIN]"})
+    .setSubject("alice@mail.com")
+    .setIssuedAt(new Date(1705318800000L))  // 2024-01-15 10:00:00
+    .setExpiration(new Date(1705336800000L))  // 2024-01-15 15:00:00
+    .signWith(key)
+    .compact();
+```
+
+### 📦 **Output (Token JWT)**
+
+```
+eyJhbGciOiJIUzI1NiJ9.eyJST0xFUyI6IltST0xFX1VTRVIsIFJPTEVfQURNSU5dIiwic3ViIjoiYWxpY2VAbWFpbC5jb20iLCJpYXQiOjE3MDUzMTg4MDAsImV4cCI6MTcwNTMzNjgwMH0.X7fK9mP3nQ8uR2vL5wE6yT4hJ1sA0bN9cM8dO6pI3gH
+```
+
+---
+
+## 🔍 Decodificación del Token Generado
+
+Puedes decodificar el token en [jwt.io](https://jwt.io):
+
+### 🔓 **Header**
+```json
+{
+  "alg": "HS256",
+  "typ": "JWT"
+}
+```
+
+### 📋 **Payload**
+```json
+{
+  "ROLES": "[ROLE_USER, ROLE_ADMIN]",
+  "sub": "alice@mail.com",
+  "iat": 1705318800,
+  "exp": 1705336800
+}
+```
+
+### 🔐 **Signature**
+```
+HMACSHA256(
+  base64UrlEncode(header) + "." +
+  base64UrlEncode(payload),
+  your-256-bit-secret
+) secret base64 encoded
+```
+
+---
+
+## 📊 Comparación de Responsabilidades
+
+| Método | Responsabilidad | Entrada | Salida |
+|--------|----------------|---------|--------|
+| **`generateToken()`** | 🎯 Preparar datos del usuario | `UserDetails` | `String` (JWT) |
+| **`getToken()`** | 🔨 Construir y firmar JWT | `Map<String, Object>`, `String` | `String` (JWT) |
+
+---
+
+## 🔐 Seguridad del Token
+
+### ✅ **Elementos de Seguridad**
+
+| Elemento | Implementación | Propósito |
+|----------|----------------|-----------|
+| **Firma HMAC-SHA256** | `.signWith(key)` | Evita manipulación del token |
+| **Secret Key** | `JWT_SECRET` (256 bits) | Clave privada para firmar |
+| **Expiración** | `setExpiration()` | Limita el tiempo de vida |
+| **Subject** | `setSubject()` | Identifica al usuario |
+
+### 🛡️ **Proceso de Firma**
+
+```
+📄 HEADER + PAYLOAD
+         ↓ Serializar
+📝 "eyJhbGc...eyJST0x..."
+         ↓ HMAC-SHA256 con SECRET
+🔐 Signature
+         ↓ Base64
+🔑 "X7fK9mP3nQ..."
+         ↓ Concatenar
+✅ TOKEN COMPLETO
+   "eyJhbGc...eyJST0x...X7fK9mP3nQ..."
+```
+
+---
+
+## 💡 Conceptos Clave
+
+```
+✅ generateToken()          → 🎯 Orquestador (prepara datos)
+✅ getToken()               → 🔨 Constructor (crea JWT)
+✅ Collections.singletonMap → 📦 Map inmutable con 1 entrada
+✅ setClaims()              → 📋 Datos personalizados
+✅ setSubject()             → 👤 Identificador del usuario
+✅ setIssuedAt()            → 📅 Timestamp de creación
+✅ setExpiration()          → ⏰ Timestamp de expiración
+✅ signWith()               → 🔐 Firma criptográfica
+✅ compact()                → 📜 Serializa a String
+```
+
+---
+
+## 🎯 Resumen Final
+
+```
+┌──────────────────────────────────────────┐
+│  ENTRADA: UserDetails                    │
+│  ┌────────────────────────────────────┐  │
+│  │ username: "alice@mail.com"         │  │
+│  │ authorities: [ROLE_USER, ROLE_ADMIN│  │
+│  └────────────────────────────────────┘  │
+└──────────────────────────────────────────┘
+                   ↓
+    ┌──────────────────────────┐
+    │   generateToken()        │
+    │   (Preparar datos)       │
+    └──────────────────────────┘
+                   ↓
+    ┌──────────────────────────┐
+    │   getToken()             │
+    │   (Construir + Firmar)   │
+    └──────────────────────────┘
+                   ↓
+┌──────────────────────────────────────────┐
+│  SALIDA: Token JWT (String)              │
+│                                          │
+│  eyJhbGciOiJIUzI1NiJ9.eyJST0xFUyI6IltS  │
+│  T0xFX1VTRVIsIFJPTEVfQURNSU5dIiwic3ViIjo │
+│  iYWxpY2VAbWFpbC5jb20iLCJpYXQiOjE3MDUzMTg │
+│  4MDAsImV4cCI6MTcwNTMzNjgwMH0.X7fK9mP3nQ │
+│  8uR2vL5wE6yT4hJ1sA0bN9cM8dO6pI3gH      │
+│                                          │
+│  ✅ Firmado con HMAC-SHA256              │
+│  ✅ Válido por 5 horas                   │
+│  ✅ Contiene roles del usuario           │
+└──────────────────────────────────────────┘
+```

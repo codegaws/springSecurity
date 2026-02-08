@@ -7,7 +7,9 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
+import java.util.Collections;
 import java.util.Date;
+import java.util.Map;
 import java.util.function.Function;
 
 @Service
@@ -41,6 +43,23 @@ public class JWTService {
 
     private String getUsernameFromToken(String token) {
         return this.getClaimsFromToken(token, Claims::getSubject);//claims->claims.getSubject()
+    }
+
+    public String generateToken(UserDetails userDetails) {
+        final Map<String, Object> claims = Collections.singletonMap("ROLES", userDetails.getAuthorities().toString());
+        return this.getToken(claims, userDetails.getUsername());
+    }
+
+    private String getToken(Map<String, Object> claims, String subject) {
+        final var key = Keys.hmacShaKeyFor(JWT_SECRET.getBytes(StandardCharsets.UTF_8));
+        return Jwts
+                .builder()
+                .setClaims(claims)
+                .setSubject(subject)
+                .setIssuedAt(new Date(System.currentTimeMillis()))
+                .setExpiration(new Date(System.currentTimeMillis() + JWT_TOKEN_VALIDITY * 1000))
+                .signWith(key)
+                .compact();
     }
 
     //validar que el token sea real
