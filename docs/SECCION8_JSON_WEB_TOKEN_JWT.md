@@ -183,3 +183,6 @@ JWT = Header + Payload + Signature
         </dependency>
         
    ```
+
+## 📝 Clase 55 -JWT USER DETAILS 👤👤️‍♂🕵️‍♂🔑 🔑 
+
