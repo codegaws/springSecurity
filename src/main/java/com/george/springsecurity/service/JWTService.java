@@ -30,6 +30,6 @@ public class JWTService {
     }
 
     private Date getExpirationDateFromToken(String token) {
-        return this.getClaimsFromToken(token, Claims::getExpiration);
+        return this.getClaimsFromToken(token, Claims::getExpiration);//claims->claims.getExpiration()
     }
 }
