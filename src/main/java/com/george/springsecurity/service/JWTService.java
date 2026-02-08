@@ -15,7 +15,7 @@ import java.util.function.Function;
 @Service
 public class JWTService {
     public static final long JWT_TOKEN_VALIDITY = 5 * 60 * 60;
-    public static final String JWT_SECRET = "jxgEQe.XHuPq8VdbyYFNkAN.dudQ0903YUn4";
+    public static final String JWT_SECRET = "jxgEQeXHuPq8VdbyYFNkANdudQ0903YUn4";
 
     private Claims getAllClaimsFromToken(String token) {
         final var key = Keys.hmacShaKeyFor(JWT_SECRET.getBytes(StandardCharsets.UTF_8));

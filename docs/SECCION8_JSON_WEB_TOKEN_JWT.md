@@ -3433,3 +3433,2150 @@ HMACSHA256(
 │  ✅ Contiene roles del usuario           │
 └──────────────────────────────────────────┘
 ```
+### ¿Entonces ese Token yo soy el que lo creo?
+# 🔐 ¿Quién Crea el Token JWT? - Explicación Clara
+
+---
+
+## 🎯 Respuesta Directa
+
+### ✅ **SÍ, TÚ creas el token JWT (no Spring Security)**
+
+```
+📦 Spring Security: Autentica al usuario (valida username/password)
+📦 TU JWTService:   Genera el token JWT después de la autenticación ✅
+```
+
+---
+
+## 🔄 Flujo Completo: Autenticación vs. Generación de Token
+
+```
+┌─────────────────────────────────────────────┐
+│  1️⃣ USUARIO ENVÍA CREDENCIALES              │
+│  POST /api/auth/login                       │
+│  {                                          │
+│    "email": "alice@mail.com",               │
+│    "password": "123456"                     │
+│  }                                          │
+└─────────────────────────────────────────────┘
+                    ↓
+┌─────────────────────────────────────────────┐
+│  2️⃣ SPRING SECURITY VALIDA CREDENCIALES    │
+│  AuthenticationManager.authenticate()       │
+│                                             │
+│  ¿Qué hace?                                 │
+│  ✅ Busca usuario en BD (CustomerRepository)│
+│  ✅ Compara password con BCrypt             │
+│  ✅ Si coincide → Usuario autenticado       │
+│  ❌ Si no → Lanza BadCredentialsException   │
+└─────────────────────────────────────────────┘
+                    ↓
+        ✅ Autenticación exitosa
+                    ↓
+┌─────────────────────────────────────────────┐
+│  3️⃣ TÚ GENERAS EL TOKEN JWT                │
+│  jwtService.generateToken(userDetails) ✅   │
+│                                             │
+│  ¿Qué hace tu JWTService?                   │
+│  📋 Extrae roles del usuario                │
+│  🔐 Firma el token con tu JWT_SECRET        │
+│  ⏰ Establece expiración (5 horas)          │
+│  📦 Retorna token JWT como String           │
+└─────────────────────────────────────────────┘
+                    ↓
+┌─────────────────────────────────────────────┐
+│  4️⃣ RETORNAS EL TOKEN AL CLIENTE           │
+│  Response: {                                │
+│    "token": "eyJhbGciOiJIUzI1NiJ9..."       │
+│  }                                          │
+└─────────────────────────────────────────────┘
+```
+
+---
+
+## 📊 Tabla Comparativa: Spring Security vs. Tu Código
+
+| Responsabilidad | ¿Quién lo hace? | Componente |
+|----------------|-----------------|------------|
+| **Validar username/password** | 🌱 Spring Security | `AuthenticationManager` |
+| **Buscar usuario en BD** | 🌱 Spring Security | `UserDetailsService` |
+| **Comparar contraseñas** | 🌱 Spring Security | `BCryptPasswordEncoder` |
+| **Generar token JWT** | 👤 **TÚ** | `JWTService.generateToken()` |
+| **Firmar el token** | 👤 **TÚ** | `JWTService.getToken()` |
+| **Definir claims del token** | 👤 **TÚ** | `JWTService.generateToken()` |
+| **Validar token en requests** | 👤 **TÚ** | `JWTService.validateToken()` |
+
+---
+
+## 🔍 ¿Con Qué Se Valida el Token?
+
+### 🎯 **Validación en DOS Niveles**
+
+```
+┌─────────────────────────────────────────────┐
+│  NIVEL 1: Validación Criptográfica 🔐       │
+│  ¿El token es auténtico y no fue alterado?  │
+└─────────────────────────────────────────────┘
+       ↓ validateToken() verifica:
+┌─────────────────────────────────────────────┐
+│  ✅ Firma del token (con JWT_SECRET)        │
+│  ✅ Token no expirado                       │
+│  ✅ Estructura válida                       │
+└─────────────────────────────────────────────┘
+
+       ↓ SI PASA ↓
+
+┌─────────────────────────────────────────────┐
+│  NIVEL 2: Validación con Base de Datos 💾   │
+│  ¿El usuario del token existe en la BD?     │
+└─────────────────────────────────────────────┘
+       ↓ validateToken() verifica:
+┌─────────────────────────────────────────────┐
+│  ✅ Username del token == Username de BD    │
+│  (Extrae "sub" del token y compara)         │
+└─────────────────────────────────────────────┘
+```
+
+---
+
+## 🧪 Ejemplo Real de Validación
+
+### 📝 **Escenario: Usuario hace un request con token**
+
+```
+┌─────────────────────────────────────────────┐
+│  REQUEST DEL CLIENTE                        │
+│  GET /api/admin/users                       │
+│  Headers: {                                 │
+│    "Authorization": "Bearer eyJhbGc..."     │
+│  }                                          │
+└─────────────────────────────────────────────┘
+                    ↓
+┌─────────────────────────────────────────────┐
+│  1️⃣ FILTRO JWT INTERCEPTA REQUEST           │
+│  JwtAuthenticationFilter                    │
+└─────────────────────────────────────────────┘
+                    ↓
+┌─────────────────────────────────────────────┐
+│  2️⃣ EXTRAE INFORMACIÓN DEL TOKEN            │
+│  String username = jwtService               │
+│      .getUsernameFromToken(token);          │
+│  // Retorna: "alice@mail.com"               │
+└─────────────────────────────────────────────┘
+                    ↓
+┌─────────────────────────────────────────────┐
+│  3️⃣ BUSCA USUARIO EN BASE DE DATOS 💾       │
+│  UserDetails userDetails = userDetailsService│
+│      .loadUserByUsername("alice@mail.com"); │
+│                                             │
+│  // Spring Security ejecuta:                │
+│  // SELECT * FROM customers                 │
+│  // WHERE email = 'alice@mail.com'          │
+│                                             │
+│  // Retorna UserDetails con:               │
+│  // - username: "alice@mail.com"            │
+│  // - roles: [ROLE_USER, ROLE_ADMIN]        │
+└─────────────────────────────────────────────┘
+                    ↓
+┌─────────────────────────────────────────────┐
+│  4️⃣ VALIDA EL TOKEN                         │
+│  boolean isValid = jwtService               │
+│      .validateToken(token, userDetails);    │
+│                                             │
+│  ¿Qué valida?                               │
+│  ✅ Username del token == Username de BD    │
+│     "alice@mail.com" == "alice@mail.com" ✅ │
+│  ✅ Token no expirado                       │
+│     exp: 1705336800 > now: 1705318800 ✅    │
+│  ✅ Firma válida (con JWT_SECRET)           │
+│                                             │
+│  Resultado: true ✅                         │
+└─────────────────────────────────────────────┘
+                    ↓
+┌─────────────────────────────────────────────┐
+│  5️⃣ AUTORIZA EL ACCESO                      │
+│  ✅ Token válido                            │
+│  ✅ Usuario existe en BD                    │
+│  ✅ Continúa con el request                 │
+└─────────────────────────────────────────────┘
+```
+
+---
+
+## 🔐 ¿Dónde Entra la Base de Datos?
+
+### 📊 **Tabla de Validación**
+
+| Paso | ¿Usa BD? | Componente | Propósito |
+|------|----------|------------|-----------|
+| **1. Generar token (login)** | ✅ **SÍ** | `CustomerRepository` | Validar credenciales |
+| **2. Firmar token** | ❌ NO | `JWTService` | Usar `JWT_SECRET` |
+| **3. Validar firma del token** | ❌ NO | `JWTService` | Verificar con `JWT_SECRET` |
+| **4. Extraer username del token** | ❌ NO | `JWTService` | Parsear claims |
+| **5. Buscar usuario por username** | ✅ **SÍ** | `CustomerRepository` | Verificar existencia |
+| **6. Comparar username token vs BD** | ✅ **SÍ** | `JWTService` | Validar autenticidad |
+
+---
+
+## 🎨 Diagrama: Token vs Base de Datos
+
+```
+┌─────────────────────────────────────────────┐
+│         TOKEN JWT CONTIENE:                 │
+│  {                                          │
+│    "sub": "alice@mail.com",    ← Username   │
+│    "ROLES": "[ROLE_USER, ROLE_ADMIN]",      │
+│    "exp": 1705336800,                       │
+│    "iat": 1705318800                        │
+│  }                                          │
+└─────────────────────────────────────────────┘
+                    ↓
+        Se compara con ↓
+                    ↓
+┌─────────────────────────────────────────────┐
+│      BASE DE DATOS (Tabla CUSTOMERS)        │
+│  +----+------------------+----------+-----+ │
+│  | ID | EMAIL            | PASSWORD | ... | │
+│  +----+------------------+----------+-----+ │
+│  | 1  | alice@mail.com   | $2a$10...|     | │
+│  +----+------------------+----------+-----+ │
+│                ↑                            │
+│    ¿Este usuario existe? ✅                 │
+└─────────────────────────────────────────────┘
+```
+
+---
+
+## 💡 Concepto Clave: JWT vs Session
+
+### 🆚 **Comparación**
+
+| Característica | Session (Tradicional) | JWT (Tu implementación) |
+|---------------|----------------------|------------------------|
+| **¿Dónde se almacena el estado?** | 💾 Servidor (memoria/BD) | 📦 Cliente (en el token) |
+| **¿Se consulta BD en cada request?** | ✅ SÍ (buscar sesión) | ⚠️ Solo para `UserDetails` |
+| **¿Quién valida el token?** | 🌱 Spring Security | 👤 Tu `JWTService` |
+| **¿Se puede revocar?** | ✅ SÍ (borrar sesión) | ❌ NO (hasta que expire) |
+
+---
+
+## 🛡️ Validación Sin Consultar BD (Opcional)
+
+Podrías validar solo con la firma del token (sin consultar BD):
+
+```java
+public Boolean validateTokenWithoutDB(String token) {
+    try {
+        // Solo verifica firma y expiración
+        Claims claims = this.getAllClaimsFromToken(token);
+        Date expiration = claims.getExpiration();
+        return !expiration.before(new Date());
+    } catch (Exception e) {
+        return false;
+    }
+}
+```
+
+**Pero generalmente NO se hace** porque:
+- ❌ No detecta usuarios eliminados de la BD
+- ❌ No detecta cambios en roles/permisos
+- ❌ No detecta usuarios bloqueados
+
+---
+
+## 📋 Resumen Final
+
+```
+┌─────────────────────────────────────────────┐
+│  ¿QUIÉN GENERA EL TOKEN?                    │
+│  👤 TÚ (JWTService.generateToken())          │
+│                                             │
+│  ¿SPRING SECURITY GENERA EL TOKEN?          │
+│  ❌ NO, Spring solo AUTENTICA al usuario     │
+└─────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────┐
+│  ¿CON QUÉ SE VALIDA EL TOKEN?               │
+│  1️⃣ Con tu JWT_SECRET (firma criptográfica) │
+│  2️⃣ Con la BASE DE DATOS (usuario existe)   │
+│  3️⃣ Comparando username token vs BD         │
+└─────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────┐
+│  FLUJO COMPLETO:                            │
+│  1. Usuario se loguea                       │
+│  2. Spring valida credenciales (usa BD) ✅  │
+│  3. TÚ generas el token JWT ✅              │
+│  4. Cliente usa token en cada request       │
+│  5. TÚ validas token (firma + BD) ✅        │
+│  6. Spring Security autoriza el acceso      │
+└─────────────────────────────────────────────┘
+```
+
+---
+
+## 🎯 Puntos Clave
+
+```
+✅ TÚ creas el token JWT (no Spring Security)
+✅ Spring Security solo autentica (valida username/password)
+✅ El token se valida con:
+   1. JWT_SECRET (firma criptográfica)
+   2. Base de Datos (verificar que el usuario existe)
+   3. Comparación (username del token == username de BD)
+✅ La BD se consulta en:
+   - Login (validar credenciales)
+   - Cada request (buscar UserDetails por username)
+❌ La BD NO se consulta para:
+   - Verificar la firma del token (usa JWT_SECRET)
+   - Parsear los claims del token
+```
+
+---
+## 📝 Clase 60 - Configurando el Entry Point de JWT 👤👤🕵️‍♂🕵️‍♂🔑 🔑 
+
+- Se crea en token 
+
+![img](img/img_37.png)
+
+- creamos Components -> JwtAuthenticationEntryPoint implementando AuthenticationEntryPoint
+- creamos un controller AuthController
+
+# 🚪 `JwtAuthenticationEntryPoint` - El "Guardia de Seguridad"
+
+---
+
+## 🎯 ¿Para Qué Sirve?
+
+Es el **manejador de errores de autenticación** en Spring Security. Intercepta cuando un usuario **NO autenticado** intenta acceder a un endpoint protegido.
+
+---
+
+## 📋 Función del `AuthenticationEntryPoint`
+
+```
+┌─────────────────────────────────────────────┐
+│  USUARIO SIN TOKEN (o token inválido)      │
+│  intenta acceder a:                         │
+│  GET /api/admin/users                       │
+└─────────────────────────────────────────────┘
+                    ↓
+┌─────────────────────────────────────────────┐
+│  Spring Security detecta:                   │
+│  ❌ No hay token                            │
+│  ❌ Token expiró                            │
+│  ❌ Token inválido                          │
+└─────────────────────────────────────────────┘
+                    ↓
+        ⚠️ AuthenticationException ⚠️
+                    ↓
+┌─────────────────────────────────────────────┐
+│  JwtAuthenticationEntryPoint.commence()     │
+│  👮 "¡Alto! No puedes pasar"                 │
+│                                             │
+│  response.sendError(                        │
+│    HttpServletResponse.SC_UNAUTHORIZED,     │
+│    "Unauthorized"                           │
+│  )                                          │
+└─────────────────────────────────────────────┘
+                    ↓
+┌─────────────────────────────────────────────┐
+│  RESPUESTA AL CLIENTE                       │
+│  HTTP 401 Unauthorized                      │
+│  {                                          │
+│    "error": "Unauthorized"                  │
+│  }                                          │
+└─────────────────────────────────────────────┘
+```
+
+---
+
+## 🔍 ¿Qué Hace el Código?
+
+```java
+@Component
+public class JwtAuthenticationEntryPoint implements AuthenticationEntryPoint {
+    
+    @Override
+    public void commence(HttpServletRequest request,
+                         HttpServletResponse response,
+                         AuthenticationException authException) 
+            throws IOException, ServletException {
+        
+        response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Unauthorized");
+        //                 │                                     │
+        //                 └─ Código HTTP 401                   └─ Mensaje de error
+    }
+}
+```
+
+| Parámetro | Tipo | Descripción |
+|-----------|------|-------------|
+| `request` | `HttpServletRequest` | La petición HTTP que falló |
+| `response` | `HttpServletResponse` | La respuesta que se enviará |
+| `authException` | `AuthenticationException` | El error de autenticación |
+
+---
+
+## 🎨 Flujo Visual Completo
+
+```
+┌─────────────────────────────────────────────┐
+│  1️⃣ CLIENTE HACE REQUEST SIN TOKEN          │
+│  GET /api/admin/users                       │
+│  Headers: {                                 │
+│    // ❌ Sin Authorization header           │
+│  }                                          │
+└─────────────────────────────────────────────┘
+                    ↓
+┌─────────────────────────────────────────────┐
+│  2️⃣ JwtAuthenticationFilter                 │
+│  Verifica si hay token...                   │
+│  ❌ NO hay token                            │
+│  ❌ No puede autenticar al usuario          │
+└─────────────────────────────────────────────┘
+                    ↓
+┌─────────────────────────────────────────────┐
+│  3️⃣ Spring Security lanza Exception         │
+│  throw new AuthenticationException(...)     │
+└─────────────────────────────────────────────┘
+                    ↓
+┌─────────────────────────────────────────────┐
+│  4️⃣ JwtAuthenticationEntryPoint.commence()  │
+│  👮 Intercepta el error                      │
+│                                             │
+│  response.sendError(401, "Unauthorized")    │
+└─────────────────────────────────────────────┘
+                    ↓
+┌─────────────────────────────────────────────┐
+│  5️⃣ RESPUESTA AL CLIENTE                    │
+│  Status: 401 Unauthorized                   │
+│  Body: "Unauthorized"                       │
+└─────────────────────────────────────────────┘
+```
+
+---
+
+## 🧪 Ejemplo Real
+
+### 📝 **Escenario: Acceso sin autenticación**
+
+```bash
+# Cliente hace request SIN token
+curl -X GET http://localhost:8080/api/admin/users
+
+# ❌ Spring Security rechaza la petición
+# ↓
+# JwtAuthenticationEntryPoint devuelve:
+HTTP/1.1 401 Unauthorized
+Content-Type: application/json
+
+{
+  "timestamp": "2024-01-15T10:00:00.000+00:00",
+  "status": 401,
+  "error": "Unauthorized",
+  "message": "Unauthorized",
+  "path": "/api/admin/users"
+}
+```
+
+---
+
+## 🛠️ Personalización del Entry Point
+
+Puedes personalizar la respuesta de error:
+
+```java
+@Component
+public class JwtAuthenticationEntryPoint implements AuthenticationEntryPoint {
+    
+    @Override
+    public void commence(HttpServletRequest request,
+                         HttpServletResponse response,
+                         AuthenticationException authException) 
+            throws IOException {
+        
+        // Configurar respuesta JSON personalizada
+        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+        response.setContentType("application/json");
+        
+        // Crear mensaje de error personalizado
+        String jsonResponse = """
+            {
+                "error": "Unauthorized",
+                "message": "Token JWT inválido o expirado",
+                "path": "%s",
+                "timestamp": "%s"
+            }
+            """.formatted(
+                request.getRequestURI(),
+                LocalDateTime.now().toString()
+            );
+        
+        response.getWriter().write(jsonResponse);
+    }
+}
+```
+
+---
+
+## 🔗 Integración con `SecurityConfig`
+
+Debes registrar el `EntryPoint` en tu configuración de seguridad:
+
+```java
+@Configuration
+@EnableMethodSecurity
+@AllArgsConstructor
+public class SecurityConfig {
+    
+    private final JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
+    
+    @Bean
+    SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        return http
+            .sessionManagement(sess -> 
+                sess.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .exceptionHandling(ex -> 
+                ex.authenticationEntryPoint(jwtAuthenticationEntryPoint)) // ← Aquí
+            .build();
+    }
+}
+```
+
+---
+
+## 📊 Casos de Uso del Entry Point
+
+| Escenario | Sin Entry Point | Con Entry Point |
+|-----------|-----------------|-----------------|
+| **Request sin token** | ❌ Error genérico de Spring | ✅ `401 Unauthorized` personalizado |
+| **Token expirado** | ❌ Error genérico de Spring | ✅ `401 Unauthorized` personalizado |
+| **Token inválido** | ❌ Error genérico de Spring | ✅ `401 Unauthorized` personalizado |
+| **Acceso no autorizado** | ❌ `403 Forbidden` genérico | ✅ Respuesta JSON personalizada |
+
+---
+
+## 🚨 Diferencia: `AuthenticationEntryPoint` vs. `AccessDeniedHandler`
+
+| Componente | Cuándo se activa | Error HTTP |
+|------------|------------------|------------|
+| **`AuthenticationEntryPoint`** | ❌ Usuario **NO autenticado** (sin token) | **401 Unauthorized** |
+| **`AccessDeniedHandler`** | ❌ Usuario autenticado pero **sin permisos** | **403 Forbidden** |
+
+### 📋 **Ejemplo**
+
+```java
+// Usuario SIN token intenta acceder
+GET /api/admin/users
+// → AuthenticationEntryPoint → 401 Unauthorized
+
+// Usuario CON token ROLE_USER intenta acceder a endpoint de ADMIN
+GET /api/admin/users  (requiere ROLE_ADMIN)
+// → AccessDeniedHandler → 403 Forbidden
+```
+
+---
+
+## 💡 Resumen
+
+```
+✅ JwtAuthenticationEntryPoint = Manejador de errores de autenticación
+✅ Se activa cuando NO hay token o es inválido
+✅ Devuelve HTTP 401 Unauthorized
+✅ Puedes personalizar el mensaje de error
+✅ Debe registrarse en SecurityConfig con .authenticationEntryPoint()
+```
+
+---
+
+## 🔑 Concepto Clave
+
+```
+🚪 AuthenticationEntryPoint es la "puerta de entrada"
+
+Sin token/token inválido
+        ↓
+🚫 Spring Security bloquea
+        ↓
+👮 EntryPoint maneja el error
+        ↓
+📝 Devuelve 401 Unauthorized al cliente
+```
+
+---
+# 🔐 Explicación Completa: `AuthController` - Endpoint de Autenticación
+
+---
+
+## 📋 Visión General
+
+Este controlador maneja el **proceso de login** y **generación de tokens JWT**.
+
+---
+
+## 🎯 ¿Qué Hace Este Controlador?
+
+```
+📥 ENTRADA: Credenciales (username + password)
+📤 SALIDA: Token JWT si las credenciales son válidas
+```
+
+---
+
+## 🏗️ Arquitectura del Controlador
+
+```java
+@RestController
+@AllArgsConstructor
+public class AuthController {
+
+    private final AuthenticationManager authenticationManager;
+    private final JwtUserDetailService jwtUserDetailService;
+    private final JWTService jwtService;
+
+    // ...métodos
+}
+```
+
+### 📦 **Dependencias Inyectadas**
+
+| Componente | Tipo | Responsabilidad |
+|------------|------|-----------------|
+| `authenticationManager` | Spring Security | ✅ Valida credenciales (username/password) |
+| `jwtUserDetailService` | Custom Service | ✅ Carga datos del usuario desde BD |
+| `jwtService` | Custom Service | ✅ Genera y valida tokens JWT |
+
+---
+
+## 1️⃣ Método `postToken()` - Endpoint de Login
+
+### 🎯 **Propósito**
+Endpoint público para que los usuarios se autentiquen y reciban un token JWT.
+
+### 💻 **Código**
+```java
+@PostMapping("/authenticate")
+public ResponseEntity<?> postToken(@RequestBody JWTRequest request) {
+    this.authenticate(request);
+
+    final var userDetails = this.jwtUserDetailService.loadUserByUsername(request.getUsername());
+
+    final String token = this.jwtService.generateToken(userDetails);
+    return ResponseEntity.ok(new JWTResponse(token));
+}
+```
+
+### 🔍 **Flujo Paso a Paso**
+
+```
+┌─────────────────────────────────────────────┐
+│  1️⃣ CLIENTE ENVÍA PETICIÓN DE LOGIN         │
+│  POST /authenticate                         │
+│  Body: {                                    │
+│    "username": "alice@mail.com",            │
+│    "password": "123456"                     │
+│  }                                          │
+└─────────────────────────────────────────────┘
+                    ↓
+┌─────────────────────────────────────────────┐
+│  2️⃣ VALIDA CREDENCIALES                     │
+│  this.authenticate(request)                 │
+│                                             │
+│  ¿Qué hace?                                 │
+│  ✅ Llama a AuthenticationManager           │
+│  ✅ Verifica username/password con BD       │
+│  ✅ Si es correcto: continúa                │
+│  ❌ Si es incorrecto: lanza Exception       │
+└─────────────────────────────────────────────┘
+                    ↓
+┌─────────────────────────────────────────────┐
+│  3️⃣ CARGA DATOS COMPLETOS DEL USUARIO       │
+│  jwtUserDetailService.loadUserByUsername(   │
+│      "alice@mail.com"                       │
+│  )                                          │
+│                                             │
+│  ¿Qué retorna?                              │
+│  UserDetails {                              │
+│    username: "alice@mail.com"               │
+│    password: "$2a$10abc..."                 │
+│    authorities: [ROLE_USER, ROLE_ADMIN]     │
+│  }                                          │
+└─────────────────────────────────────────────┘
+                    ↓
+┌─────────────────────────────────────────────┐
+│  4️⃣ GENERA TOKEN JWT                        │
+│  jwtService.generateToken(userDetails)      │
+│                                             │
+│  ¿Qué hace?                                 │
+│  📋 Extrae roles: "[ROLE_USER, ROLE_ADMIN]" │
+│  🔐 Firma con JWT_SECRET                    │
+│  ⏰ Establece expiración (5h)               │
+│  📦 Retorna: "eyJhbGciOiJIUzI1NiJ9..."      │
+└─────────────────────────────────────────────┘
+                    ↓
+┌─────────────────────────────────────────────┐
+│  5️⃣ RETORNA TOKEN AL CLIENTE                │
+│  ResponseEntity.ok(new JWTResponse(token))  │
+│                                             │
+│  HTTP 200 OK                                │
+│  {                                          │
+│    "jwt": "eyJhbGciOiJIUzI1NiJ9..."         │
+│  }                                          │
+└─────────────────────────────────────────────┘
+```
+
+---
+
+## 2️⃣ Método `authenticate()` - Validación de Credenciales
+
+### 🎯 **Propósito**
+Delega la validación de credenciales a Spring Security.
+
+### 💻 **Código**
+```java
+private void authenticate(JWTRequest request) {
+    try {
+        this.authenticationManager.authenticate(
+                new UsernamePasswordAuthenticationToken(
+                    request.getUsername(),
+                    request.getPassword()
+                )
+        );
+    } catch (BadCredentialsException | DisabledException e) {
+        throw new RuntimeException("Incorrect username or password");
+    }
+}
+```
+
+### 🔍 **¿Qué Hace `AuthenticationManager`?**
+
+```
+┌─────────────────────────────────────────────┐
+│  AuthenticationManager.authenticate()       │
+│                                             │
+│  1️⃣ Busca el usuario en la BD               │
+│     UserDetailsService.loadUserByUsername() │
+│     SELECT * FROM customers                 │
+│     WHERE email = 'alice@mail.com'          │
+│                                             │
+│  2️⃣ Compara la contraseña                   │
+│     BCryptPasswordEncoder.matches(          │
+│       "123456",              ← Input        │
+│       "$2a$10abc..."         ← BD (hash)    │
+│     )                                       │
+│                                             │
+│  3️⃣ Resultado                               │
+│     ✅ Contraseñas coinciden → Autenticado  │
+│     ❌ No coinciden → BadCredentialsException│
+└─────────────────────────────────────────────┘
+```
+
+### 📊 **Flujo de Validación**
+
+```
+┌─────────────────────────────────────────────┐
+│  ENTRADA: JWTRequest                        │
+│  {                                          │
+│    "username": "alice@mail.com",            │
+│    "password": "123456"                     │
+│  }                                          │
+└─────────────────────────────────────────────┘
+                    ↓
+        ┌───────────────────────────┐
+        │ UsernamePasswordAuthenticationToken
+        │                           │
+        │ Crea objeto con:          │
+        │ - Principal: "alice@mail.com"
+        │ - Credentials: "123456"   │
+        └───────────────────────────┘
+                    ↓
+        ┌───────────────────────────┐
+        │ AuthenticationManager     │
+        │                           │
+        │ 1. Busca usuario en BD    │
+        │ 2. Verifica password      │
+        │ 3. Valida estado (enabled)│
+        └───────────────────────────┘
+                    ↓┌─────────────┐      ┌─────────────┐
+    │ ✅ VÁLIDO   │      │ ❌ INVÁLIDO │
+    │             │      │             │
+    │ Retorna sin │      │ Lanza       │
+    │ hacer nada  │      │ Exception   │
+    └─────────────┘      └─────────────┘
+                              ↓
+                    ┌─────────────────┐
+                    │ catch block     │
+                    │                 │
+                    │ throw new       │
+                    │ RuntimeException│
+                    │ ("Incorrect...") │
+                    └─────────────────┘
+```
+
+---
+
+## 🧪 Ejemplo Completo con Datos Reales
+
+### 📝 **Escenario: Login Exitoso**
+
+```bash
+# 1️⃣ Cliente envía request
+POST http://localhost:8080/authenticate
+Content-Type: application/json
+
+{
+  "username": "alice@mail.com",
+  "password": "123456"
+}
+```
+
+```java
+// ═══════════════════════════════════════════
+// DENTRO DEL SERVIDOR
+// ═══════════════════════════════════════════
+
+// 2️⃣ postToken() recibe el request
+JWTRequest request = {
+    username: "alice@mail.com",
+    password: "123456"
+};
+
+// 3️⃣ authenticate(request)
+//    ↓
+//    AuthenticationManager busca en BD:
+//    SELECT * FROM customers WHERE email = 'alice@mail.com'
+//    ↓
+//    Resultado:
+//    Customer {
+//        id: 1,
+//        email: "alice@mail.com",
+//        password: "$2a$10$xyz...", ← Hash BCrypt
+//        roles: [ROLE_USER, ROLE_ADMIN]
+//    }
+//    ↓
+//    BCryptPasswordEncoder.matches("123456", "$2a$10$xyz...")
+//    ✅ true → Autenticación exitosa
+
+// 4️⃣ Cargar UserDetails completo
+UserDetails userDetails = jwtUserDetailService.loadUserByUsername("alice@mail.com");
+// Retorna:
+// UserDetails {
+//     username: "alice@mail.com",
+//     password: "$2a$10$xyz...",
+//     authorities: [
+//         SimpleGrantedAuthority("ROLE_USER"),
+//         SimpleGrantedAuthority("ROLE_ADMIN")
+//     ]
+// }
+
+// 5️⃣ Generar token JWT
+String token = jwtService.generateToken(userDetails);
+// Retorna:
+// "eyJhbGciOiJIUzI1NiJ9.eyJST0xFUyI6IltST0xFX1VTRVIsIFJPTEVfQURNSU5dIiwic3ViIjoiYWxpY2VAbWFpbC5jb20iLCJpYXQiOjE3MDUzMTg4MDAsImV4cCI6MTcwNTMzNjgwMH0.X7fK9mP3nQ8uR2vL5wE6yT4hJ1sA0bN9cM8dO6pI3gH"
+
+// 6️⃣ Crear respuesta
+JWTResponse response = new JWTResponse(token);
+// { "jwt": "eyJhbGc..." }
+
+// 7️⃣ Retornar al cliente
+return ResponseEntity.ok(response);
+```
+
+```bash
+# 8️⃣ Cliente recibe respuesta
+HTTP/1.1 200 OK
+Content-Type: application/json
+
+{
+  "jwt": "eyJhbGciOiJIUzI1NiJ9.eyJST0xFUyI6IltST0xFX1VTRVIsIFJPTEVfQURNSU5dIiwic3ViIjoiYWxpY2VAbWFpbC5jb20iLCJpYXQiOjE3MDUzMTg4MDAsImV4cCI6MTcwNTMzNjgwMH0.X7fK9mP3nQ8uR2vL5wE6yT4hJ1sA0bN9cM8dO6pI3gH"
+}
+```
+
+---
+
+## 🚨 Manejo de Errores
+
+### ❌ **Caso 1: Credenciales Incorrectas**
+
+```bash
+POST /authenticate
+{
+  "username": "alice@mail.com",
+  "password": "wrongpassword"
+}
+```
+
+```
+┌─────────────────────────────────────────────┐
+│  authenticate(request)                      │
+│  ↓                                          │
+│  AuthenticationManager.authenticate()       │
+│  ↓                                          │
+│  BCryptPasswordEncoder.matches(             │
+│    "wrongpassword",                         │
+│    "$2a$10$xyz..."                          │
+│  )                                          │
+│  ↓                                          │
+│  ❌ false → BadCredentialsException         │
+│  ↓                                          │
+│  catch block                                │
+│  ↓                                          │
+│  throw new RuntimeException(                │
+│    "Incorrect username or password"         │
+│  )                                          │
+└─────────────────────────────────────────────┘
+```
+
+```bash
+# Respuesta al cliente
+HTTP/1.1 500 Internal Server Error
+
+{
+  "error": "Incorrect username or password"
+}
+```
+
+---
+
+### ❌ **Caso 2: Usuario Deshabilitado**
+
+```bash
+POST /authenticate
+{
+  "username": "disabled@mail.com",
+  "password": "123456"
+}
+```
+
+```
+┌─────────────────────────────────────────────┐
+│  AuthenticationManager detecta:             │
+│  Customer.enabled = false                   │
+│  ↓                                          │
+│  DisabledException                          │
+│  ↓                                          │
+│  throw new RuntimeException(                │
+│    "Incorrect username or password"         │
+│  )                                          │
+└─────────────────────────────────────────────┘
+```
+
+---
+
+## 🎨 Diagrama de Arquitectura Completa
+
+```
+┌─────────────────────────────────────────────┐
+│           CLIENTE (Postman/Frontend)        │
+└─────────────────────────────────────────────┘
+                    ↓
+        POST /authenticate
+        {username, password}
+                    ↓
+┌─────────────────────────────────────────────┐
+│         AuthController.postToken()          │
+│                                             │
+│  1. authenticate(request)                   │
+│     ↓                                       │
+│  ┌─────────────────────────────────────┐   │
+│  │ AuthenticationManager               │   │
+│  │ ↓                                   │   │
+│  │ UserDetailsService                  │   │
+│  │ ↓                                   │   │
+│  │ CustomerRepository (BD)             │   │
+│  │ ↓                                   │   │
+│  │ BCryptPasswordEncoder               │   │
+│  │ ↓                                   │   │
+│  │ ✅ Autenticado                      │   │
+│  └─────────────────────────────────────┘   │
+│                                             │
+│  2. loadUserByUsername()                    │
+│     ↓                                       │
+│  ┌─────────────────────────────────────┐   │
+│  │ JwtUserDetailService                │   │
+│  │ ↓                                   │   │
+│  │ CustomerRepository.findByEmail()    │   │
+│  │ ↓                                   │   │
+│  │ Retorna UserDetails                 │   │
+│  └─────────────────────────────────────┘   │
+│                                             │
+│  3. generateToken(userDetails)              │
+│     ↓                                       │
+│  ┌─────────────────────────────────────┐   │
+│  │ JWTService                          │   │
+│  │ ↓                                   │   │
+│  │ Extrae roles                        │   │
+│  │ ↓                                   │   │
+│  │ Firma con JWT_SECRET                │   │
+│  │ ↓                                   │   │
+│  │ Retorna token JWT                   │   │
+│  └─────────────────────────────────────┘   │
+│                                             │
+│  4. return ResponseEntity.ok(token)         │
+└─────────────────────────────────────────────┘
+                    ↓
+┌─────────────────────────────────────────────┐
+│         RESPUESTA AL CLIENTE                │
+│  {                                          │
+│    "jwt": "eyJhbGciOiJIUzI1NiJ9..."         │
+│  }                                          │
+└─────────────────────────────────────────────┘
+```
+
+---
+
+## 🔑 ¿Por Qué Se Llama Dos Veces a la BD?
+
+### 📊 **Tabla de Llamadas**
+
+| Paso | Método | ¿Consulta BD? | Propósito |
+|------|--------|---------------|-----------|
+| **1** | `authenticate()` | ✅ **SÍ** | Validar credenciales (username/password) |
+| **2** | `loadUserByUsername()` | ✅ **SÍ** | Obtener datos completos (roles, permisos) |
+
+### 💡 **¿Por Qué?**
+
+```
+1️⃣ Primera llamada (authenticate):
+   - Spring Security valida SOLO credenciales
+   - Retorna un Authentication básico
+   - NO incluye todos los datos del UserDetails
+
+2️⃣ Segunda llamada (loadUserByUsername):
+   - Necesitamos el UserDetails COMPLETO
+   - Para extraer los roles/authorities
+   - Para generar el token JWT con los claims
+```
+
+---
+
+## 🛠️ Mejora: Evitar la Doble Consulta
+
+Puedes optimizar usando el `Authentication` retornado:
+
+```java
+@PostMapping("/authenticate")
+public ResponseEntity<?> postToken(@RequestBody JWTRequest request) {
+    // Autenticar y guardar el resultado
+    Authentication authentication = this.authenticationManager.authenticate(
+        new UsernamePasswordAuthenticationToken(
+            request.getUsername(),
+            request.getPassword()
+        )
+    );
+
+    // El Authentication ya contiene el UserDetails
+    UserDetails userDetails = (UserDetails) authentication.getPrincipal();
+
+    // Generar token
+    final String token = this.jwtService.generateToken(userDetails);
+    return ResponseEntity.ok(new JWTResponse(token));
+}
+```
+
+---
+
+## 📋 DTOs: `JWTRequest` y `JWTResponse`
+
+### 📥 **JWTRequest (Input)**
+
+```java
+@Data
+public class JWTRequest {
+    private String username;
+    private String password;
+}
+```
+
+| Campo | Tipo | Descripción |
+|-------|------|-------------|
+| `username` | `String` | Email del usuario |
+| `password` | `String` | Contraseña en texto plano |
+
+---
+
+### 📤 **JWTResponse (Output)**
+
+```java
+@Data
+@AllArgsConstructor
+public class JWTResponse {
+    private String jwt;
+}
+```
+
+| Campo | Tipo | Descripción |
+|-------|------|-------------|
+| `jwt` | `String` | Token JWT generado |
+
+---
+
+## 💡 Resumen Final
+
+```
+┌─────────────────────────────────────────────┐
+│  FLUJO COMPLETO DE LOGIN:                   │
+│                                             │
+│  1️⃣ Cliente envía username + password       │
+│  2️⃣ AuthenticationManager valida credenciales (BD) │
+│  3️⃣ UserDetailsService carga datos completos (BD) │
+│  4️⃣ JWTService genera token JWT             │
+│  5️⃣ Retorna token al cliente                │
+└─────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────┐
+│  ¿QUIÉN GENERA EL TOKEN?                    │
+│  👤 TÚ (JWTService)                          │
+│                                             │
+│  ¿SPRING GENERA EL TOKEN?                   │
+│  ❌ NO, Spring solo VALIDA credenciales     │
+└─────────────────────────────────────────────┘
+```
+
+---
+
+## 🎯 Conceptos Clave
+
+```
+✅ AuthController = Endpoint de login
+✅ AuthenticationManager = Valida credenciales (Spring Security)
+✅ JwtUserDetailService = Carga UserDetails desde BD
+✅ JWTService = Genera y firma el token JWT
+✅ JWTRequest = DTO de entrada (username + password)
+✅ JWTResponse = DTO de salida (token JWT)
+✅ El token lo generas TÚ, no Spring Security
+```
+
+# GRAN PREGUNTA Y PARA QUE DEBO GENERAR EL TOKEN
+
+# 🔐 ¿Por Qué Generar un Token JWT Si Ya Validé el Usuario?
+
+---
+
+## 🎯 La Pregunta Clave
+
+```
+❓ Si ya validé username/password con la BD...
+❓ ¿Para qué genero un token?
+❓ ¿Con qué lo voy a validar si yo mismo lo creé?
+```
+
+---
+
+## 💡 La Respuesta: **Evitar Consultar la BD en Cada Request**
+
+### 📊 **Comparación: Sin Token vs Con Token**
+
+```
+┌─────────────────────────────────────────────┐
+│  SIN TOKEN (Session Tradicional)            │
+└─────────────────────────────────────────────┘
+
+Usuario hace 1000 requests:
+  GET /api/products          → 💾 Consulta BD
+  GET /api/cart              → 💾 Consulta BD
+  POST /api/orders           → 💾 Consulta BD
+  ...
+  (1000 consultas a la BD) ❌
+
+┌─────────────────────────────────────────────┐
+│  CON TOKEN JWT                              │
+└─────────────────────────────────────────────┘
+
+Usuario hace 1000 requests:
+  POST /authenticate         → 💾 Consulta BD (1 vez)
+    ↓
+  Cliente guarda el token
+    [...]
+  GET /api/products   + token → ✅ Valida con JWT_SECRET
+  GET /api/cart       + token → ✅ Valida con JWT_SECRET
+  POST /api/orders    + token → ✅ Valida con JWT_SECRET
+  ...
+  (0 consultas a la BD) ✅
+```
+
+---
+
+## 🔑 El Token JWT Es una "Llave Criptográfica"
+
+### 🎨 **Analogía: Llave de Hotel**
+
+```
+┌─────────────────────────────────────────────┐
+│  🏨 HOTEL (Tu API)                          │
+│                                             │
+│  1️⃣ Llegas a recepción (POST /authenticate) │
+│     - Muestras tu cédula (username/password)│
+│     - Recepcionista valida en sistema (BD)  │
+│     - ✅ Te da una LLAVE electrónica (JWT)  │
+│                                             │
+│  2️⃣ Usas la llave para entrar a tu cuarto   │
+│     - GET /api/rooms/101                    │
+│     - La cerradura valida la llave          │
+│     - ❌ NO consulta a recepción cada vez   │
+│     - ✅ La llave tiene firma digital       │
+│                                             │
+│  3️⃣ ¿Cómo sabe que la llave es legítima?    │
+│     - Firmada con código secreto del hotel  │
+│     - Tiene fecha de expiración             │
+│     - Contiene info del huésped (roles)     │
+└─────────────────────────────────────────────┘
+```
+
+---
+
+## 🔐 ¿Cómo Se Valida el Token Sin Consultar BD?
+
+### 📋 **El Token Contiene TODO lo Necesario**
+
+```
+┌─────────────────────────────────────────────┐
+│  TOKEN JWT GENERADO EN LOGIN                │
+│                                             │
+│  eyJhbGciOiJIUzI1NiJ9.                      │
+│  eyJST0xFUyI6IltST0xFX1VTRVIsIFJPTEVfQURN  │
+│  SU5dIiwic3ViIjoiYWxpY2VAbWFpbC5jb20iLCJp  │
+│  YXQiOjE3MDUzMTg4MDAsImV4cCI6MTcwNTMzNjgw  │
+│  MH0.                                       │
+│  X7fK9mP3nQ8uR2vL5wE6yT4hJ1sA0bN9cM8dO6pI3gH
+│                                             │
+│  ┌─────────────────────────────────────┐   │
+│  │ HEADER (Algoritmo)                  │   │
+│  │ {                                   │   │
+│  │   "alg": "HS256",                   │   │
+│  │   "typ": "JWT"                      │   │
+│  │ }                                   │   │
+│  └─────────────────────────────────────┘   │
+│                                             │
+│  ┌─────────────────────────────────────┐   │
+│  │ PAYLOAD (Datos del usuario)         │   │
+│  │ {                                   │   │
+│  │   "sub": "alice@mail.com",  ← Username│  │
+│  │   "ROLES": "[ROLE_USER, ROLE_ADMIN]",│  │
+│  │   "iat": 1705318800,  ← Creado      │   │
+│  │   "exp": 1705336800   ← Expira      │   │
+│  │ }                                   │   │
+│  └─────────────────────────────────────┘   │
+│                                             │
+│  ┌─────────────────────────────────────┐   │
+│  │ SIGNATURE (Firma Digital)           │   │
+│  │                                     │   │
+│  │ HMACSHA256(                         │   │
+│  │   base64(header) + "." +            │   │
+│  │   base64(payload),                  │   │
+│  │   JWT_SECRET  ← ¡CLAVE SECRETA!     │   │
+│  │ )                                   │   │
+│  └─────────────────────────────────────┘   │
+└─────────────────────────────────────────────┘
+```
+
+---
+
+## 🔍 Validación del Token (Sin BD)
+
+### 🎯 **3 Validaciones Criptográficas**
+
+```java
+// Código en JWTService.validateToken()
+
+public Boolean validateToken(String token, UserDetails userDetails) {
+    // 1️⃣ Extraer username del token
+    final String username = getUsernameFromToken(token);
+    //    ↓
+    //    Decodifica el payload
+    //    Retorna: "alice@mail.com"
+
+    // 2️⃣ Verificar que el username coincide
+    boolean usernameMatches = username.equals(userDetails.getUsername());
+    //    ↓
+    //    "alice@mail.com" == "alice@mail.com" ✅
+
+    // 3️⃣ Verificar que el token NO expiró
+    boolean isNotExpired = !isTokenExpired(token);
+    //    ↓
+    //    exp: 1705336800 (timestamp futuro)
+    //    now: 1705318800 (timestamp actual)
+    //    1705336800 > 1705318800 ✅
+
+    // 4️⃣ Verificar la firma criptográfica (¡CLAVE!)
+    //    Jwts.parser()
+    //        .setSigningKey(JWT_SECRET)  ← Usa tu secreto
+    //        .parseClaimsJws(token);     ← Valida firma
+    //    ↓
+    //    Si la firma NO coincide → SignatureException ❌
+    //    Si coincide → ✅ Token legítimo
+
+    return usernameMatches && isNotExpired;
+}
+```
+
+---
+
+## 🛡️ ¿Con Qué Se Valida el Token?
+
+### 📊 **Tabla de Validación**
+
+| Validación | ¿Consulta BD? | ¿Cómo se valida? |
+|------------|---------------|------------------|
+| **1. Firma del token** | ❌ NO | Con `JWT_SECRET` (clave secreta) |
+| **2. Expiración** | ❌ NO | Comparando `exp` claim con fecha actual |
+| **3. Estructura del token** | ❌ NO | Verificando formato JSON válido |
+| **4. Username existe** | ⚠️ OPCIONAL | Consultando BD |
+
+---
+
+## 🔐 La Magia: La Firma Criptográfica
+
+### 🎯 **¿Cómo Funciona?**
+
+```
+┌─────────────────────────────────────────────┐
+│  GENERACIÓN DEL TOKEN (Login)               │
+└─────────────────────────────────────────────┘
+
+1️⃣ Creas el payload:
+   {
+     "sub": "alice@mail.com",
+     "ROLES": "[ROLE_USER, ROLE_ADMIN]",
+     "exp": 1705336800
+   }
+
+2️⃣ Firmas con tu JWT_SECRET:
+   signature = HMACSHA256(
+     header + payload,
+     "mi_super_secreto_que_nadie_conoce_xyz123"
+   )↓
+   Resultado: X7fK9mP3nQ8uR2vL5wE6yT4hJ1sA0bN9cM8dO6pI3gH
+
+3️⃣ Token completo:
+   header.payload.signature
+
+┌─────────────────────────────────────────────┐
+│  VALIDACIÓN DEL TOKEN (Requests posteriores)│
+└─────────────────────────────────────────────┘
+
+1️⃣ Cliente envía el token:
+   Authorization: Bearer eyJhbGciOiJIUzI1NiJ9...
+
+2️⃣ TU servidor recibe el token
+
+3️⃣ Intentas validar la firma:
+   expectedSignature = HMACSHA256(
+     header + payload,
+     "mi_super_secreto_que_nadie_conoce_xyz123"
+   )
+
+4️⃣ Comparas firmas:
+   expectedSignature == tokenSignature
+   ↓
+   ✅ SÍ coinciden → Token legítimo
+   ❌ NO coinciden → Token falso/alterado
+```
+
+---
+
+## 🚨 ¿Qué Pasa Si Alguien Intenta Falsificar el Token?
+
+### 📝 **Escenario: Hacker Malicioso**
+
+```
+┌─────────────────────────────────────────────┐
+│  HACKER intenta cambiar el payload          │
+└─────────────────────────────────────────────┘
+
+1️⃣ Token original:
+   {
+     "sub": "hacker@mail.com",
+     "ROLES": "[ROLE_USER]",    ← Solo USER
+     "exp": 1705336800
+   }
+
+2️⃣ Hacker modifica el payload:
+   {
+     "sub": "hacker@mail.com",
+     "ROLES": "[ROLE_USER, ROLE_ADMIN]", ← ¡Agregó ADMIN!
+     "exp": 1705336800
+   }
+
+3️⃣ Hacker envía el token modificado a tu API
+
+4️⃣ Tu servidor intenta validar:
+   expectedSignature = HMACSHA256(
+     header + PAYLOAD_MODIFICADO,
+     JWT_SECRET
+   )
+   ↓
+   expectedSignature ≠ tokenSignature ❌
+   ↓
+   SignatureException: "JWT signature does not match"
+   ↓
+   🚫 ACCESO DENEGADO
+
+┌─────────────────────────────────────────────┐
+│  ¿POR QUÉ FALLA?                            │
+│                                             │
+│  El hacker NO conoce tu JWT_SECRET          │
+│  No puede generar una firma válida          │
+│  Cualquier modificación invalida el token   │
+└─────────────────────────────────────────────┘
+```
+
+---
+
+## 🎨 Flujo Completo: Login → Request Protegido
+
+```
+┌─────────────────────────────────────────────┐
+│  1️⃣ LOGIN (POST /authenticate)              │
+│                                             │
+│  Cliente envía:                             │
+│  {                                          │
+│    "username": "alice@mail.com",            │
+│    "password": "123456"                     │
+│  }                                          │
+│                                             │
+│  ↓                                          │
+│  AuthenticationManager valida con BD ✅     │
+│  ↓                                          │
+│  JWTService genera token:                   │
+│  - Extrae roles de BD                       │
+│  - Firma con JWT_SECRET                     │
+│  - Establece expiración                     │
+│  ↓                                          │
+│  Retorna: "eyJhbGciOiJIUzI1NiJ9..."         │
+└─────────────────────────────────────────────┘
+                    ↓
+        Cliente guarda el token
+                    ↓
+┌─────────────────────────────────────────────┐
+│  2️⃣ REQUEST PROTEGIDO                       │
+│  (GET /api/admin/users)                     │
+│                                             │
+│  Cliente envía:                             │
+│  Headers: {                                 │
+│    Authorization: "Bearer eyJhbGc..."       │
+│  }                                          │
+│                                             │
+│  ↓                                          │
+│  JwtAuthenticationFilter intercepta         │
+│  ↓                                          │
+│  JWTService.validateToken():                │
+│  ┌─────────────────────────────────────┐   │
+│  │ 1. Verifica firma con JWT_SECRET ✅ │   │
+│  │ 2. Verifica expiración ✅           │   │
+│  │ 3. Extrae username y roles ✅       │   │
+│  │ 4. NO consulta BD ✅                │   │
+│  └─────────────────────────────────────┘   │
+│  ↓                                          │
+│  Spring Security autoriza el acceso ✅      │
+│  ↓                                          │
+│  Retorna datos al cliente                   │
+└─────────────────────────────────────────────┘
+```
+
+---
+
+## 📊 Comparación: Session vs JWT
+
+| Característica | Session (Tradicional) | JWT (Tu implementación) |
+|---------------|----------------------|------------------------|
+| **¿Dónde se guarda el estado?** | 💾 Servidor (memoria/BD) | 📦 Cliente (token) |
+| **¿Consulta BD en cada request?** | ✅ SÍ (buscar sesión) | ❌ NO (valida con firma) |
+| **Escalabilidad** | ❌ Difícil (sesiones en memoria) | ✅ Fácil (stateless) |
+| **¿Se puede revocar?** | ✅ SÍ (eliminar sesión) | ⚠️ NO (hasta que expire) |
+| **Seguridad ante modificación** | ✅ Inmune (estado en servidor) | ✅ Inmune (firma criptográfica) |
+
+---
+
+## 💡 Resumen: ¿Para Qué Sirve el Token?
+
+```
+┌─────────────────────────────────────────────┐
+│  PROPÓSITO DEL TOKEN JWT:                   │
+│                                             │
+│  ✅ Evitar consultar BD en cada request     │
+│  ✅ Validar usuario con firma criptográfica │
+│  ✅ Contener roles/permisos del usuario     │
+│  ✅ Tener expiración automática             │
+│  ✅ Ser stateless (no guardar sesiones)     │
+│  ✅ Escalar horizontalmente                 │
+└─────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────┐
+│  ¿CON QUÉ SE VALIDA?                        │
+│                                             │
+│  🔐 Con tu JWT_SECRET (clave secreta)       │
+│  ⏰ Con la fecha de expiración (exp claim)  │
+│  📋 Con la estructura del token             │
+│  ⚠️ OPCIONAL: Con la BD (para casos especiales) │
+└─────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────┐
+│  LA CLAVE:                                  │
+│                                             │
+│  El token ES una "llave firmada digitalmente"│
+│  Solo quien conoce JWT_SECRET puede validarlo│
+│  Es imposible falsificar sin el secreto     │
+└─────────────────────────────────────────────┘
+```
+
+---
+
+## 🎯 Conceptos Clave
+
+```
+✅ JWT = "Llave criptográfica" auto-contenida
+✅ Se valida con JWT_SECRET (no con BD)
+✅ Firma digital impide falsificaciones
+✅ Reduce carga en BD (solo 1 consulta en login)
+✅ Token contiene TODO (username, roles, expiración)
+✅ Es stateless (servidor no guarda sesiones)
+```
+---
+
+# ¿ALGO INTERESANTE COMO SE COMPARA EL TOKEN CON EL SECRET?🔐🔐🔐
+
+## 🔐 ¡EXACTO! - Explicación del `JWT_SECRET`
+
+---
+
+## 🎯 Respuesta Directa
+
+**SÍ**, el `JWT_SECRET` se usa para **validar** que tu token es legítimo.
+
+---
+
+## 🔍 ¿Cómo Funciona? - Explicación Paso a Paso
+
+### 📋 **Tu Token Real**
+
+```json
+{
+  "jwt": "eyJhbGciOiJIUzI1NiJ9.eyJST0xFUyI6IltWSUVXX0FDQ09VTlRdIiwic3ViIjoiYWNjb3VudEBkZWJ1Z2dlYW5kb2llYXMuY29tIiwiaWF0IjoxNzcwNTg5MzU0LCJleHAiOjE3NzA2MDczNTR9.GCk5CWs70Wf3-zmTI1URArCzaNa1sf7R8cKCvNsjQgY"
+}
+```
+
+---
+
+## 🧩 Decodificación de Tu Token
+
+### 🔓 **Partes del Token**
+
+```
+eyJhbGciOiJIUzI1NiJ9
+│
+└─ HEADER
+
+eyJST0xFUyI6IltWSUVXX0FDQ09VTlRdIiwic3ViIjoiYWNjb3VudEBkZWJ1Z2dlYW5kb2llYXMuY29tIiwiaWF0IjoxNzcwNTg5MzU0LCJleHAiOjE3NzA2MDczNTR9
+│
+└─ PAYLOAD
+
+GCk5CWs70Wf3-zmTI1URArCzaNa1sf7R8cKCvNsjQgY
+│
+└─ SIGNATURE ← ¡AQUÍ SE USA JWT_SECRET!
+```
+
+---
+
+### 📦 **HEADER (Decodificado)**
+
+```json
+{
+  "alg": "HS256",
+  "typ": "JWT"
+}
+```
+
+---
+
+### 📋 **PAYLOAD (Decodificado)**
+
+```json
+{
+  "ROLES": "[VIEW_ACCOUNT]",
+  "sub": "account@debuggeanoideas.com",
+  "iat": 1770589354,
+  "exp": 1770607354
+}
+```
+
+---
+
+### 🔐 **SIGNATURE (La Clave)**
+
+```
+GCk5CWs70Wf3-zmTI1URArCzaNa1sf7R8cKCvNsjQgY
+```
+
+**Esta firma se generó usando tu `JWT_SECRET`:**
+
+```java
+JWT_SECRET = "jxgEQe.XHuPq8VdbyYFNkAN.dudQ0903YUn4";
+```
+
+---
+
+## 🔨 ¿Cómo Se Generó la Firma?
+
+### 🎨 **Proceso de Generación (Login)**
+
+```
+┌─────────────────────────────────────────────┐
+│  1️⃣ CUANDO GENERASTE EL TOKEN               │
+│  (POST /authenticate)                       │
+└─────────────────────────────────────────────┘
+
+1. Creas el HEADER:
+   {
+     "alg": "HS256",
+     "typ": "JWT"
+   }↓
+   Base64URL: eyJhbGciOiJIUzI1NiJ9
+
+2. Creas el PAYLOAD:
+   {
+     "ROLES": "[VIEW_ACCOUNT]",
+     "sub": "account@debuggeanoideas.com",
+     "iat": 1770589354,
+     "exp": 1770607354
+   }
+   ↓
+   Base64URL: eyJST0xFUyI6IltWSUVXX0FDQ09VTlRdIiwic3Vi...
+
+3. Generas la FIRMA con tu JWT_SECRET:
+   ↓
+   signature = HMACSHA256(
+     "eyJhbGciOiJIUzI1NiJ9" + "." + "eyJST0xFUyI6Ilt...",
+     "jxgEQe.XHuPq8VdbyYFNkAN.dudQ0903YUn4"  ← JWT_SECRET
+   )
+   ↓
+   Resultado: GCk5CWs70Wf3-zmTI1URArCzaNa1sf7R8cKCvNsjQgY
+
+4. Token completo:
+   header.payload.signature
+```
+
+---
+
+## 🛡️ ¿Cómo Se Valida la Firma?
+
+### 🔍 **Proceso de Validación (Request)**
+
+```
+┌─────────────────────────────────────────────┐
+│  2️⃣ CUANDO VALIDAS EL TOKEN                 │
+│  (GET /api/admin/users)                     │
+└─────────────────────────────────────────────┘
+
+1. Cliente envía el token:
+   Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJST0xFUyI6...
+
+2. Tu JWTService extrae las partes:
+   header  = "eyJhbGciOiJIUzI1NiJ9"
+   payload = "eyJST0xFUyI6IltWSUVXX0FDQ09VTlRdIiwic3Vi..."
+   signatureReceived = "GCk5CWs70Wf3-zmTI1URArCzaNa1sf7R8cKCvNsjQgY"
+
+3. Tu servidor RECALCULA la firma con tu JWT_SECRET:
+   ↓
+   expectedSignature = HMACSHA256(
+     header + "." + payload,
+     "jxgEQe.XHuPq8VdbyYFNkAN.dudQ0903YUn4"  ← JWT_SECRET
+   )
+   ↓
+   Resultado: GCk5CWs70Wf3-zmTI1URArCzaNa1sf7R8cKCvNsjQgY
+
+4. Compara las firmas:
+   ↓
+   expectedSignature == signatureReceived
+   ↓
+   "GCk5CWs70Wf3..." == "GCk5CWs70Wf3..." ✅
+   ↓
+   ✅ Token válido (firma coincide)
+```
+
+---
+
+## 🧪 Ejemplo Visual: Generación vs Validación
+
+```
+┌─────────────────────────────────────────────┐
+│  LOGIN (Generación del Token)               │
+└─────────────────────────────────────────────┘
+
+Input:
+  username: "account@debuggeanoideas.com"
+  password: "123456"
+
+Proceso:
+  1. Validar credenciales con BD ✅
+  2. Crear payload con roles:
+     {
+       "ROLES": "[VIEW_ACCOUNT]",
+       "sub": "account@debuggeanoideas.com",
+       "iat": 1770589354,
+       "exp": 1770607354
+     }
+  3. Firmar con JWT_SECRET:
+     HMACSHA256(
+       header + payload,
+       "jxgEQe.XHuPq8VdbyYFNkAN.dudQ0903YUn4"
+     )
+     ↓
+     Firma: GCk5CWs70Wf3-zmTI1URArCzaNa1sf7R8cKCvNsjQgY
+
+Output:
+  eyJhbGciOiJIUzI1NiJ9.eyJST0xFUyI6IltWSUVXX0FDQ09VTlRdIiwic3ViOiJhY2NvdW50QGRlYnVnZ2VhbmRvaWVhcy5jb20iLCJpYXQiOjE3NzA1ODkzNTQsImV4cCI6MTc3MDYwNzM1NH0.GCk5CWs70Wf3-zmTI1URArCzaNa1sf7R8cKCvNsjQgY
+
+═════════════════════════════════════════════
+
+┌─────────────────────────────────────────────┐
+│  REQUEST (Validación del Token)             │
+└─────────────────────────────────────────────┘
+
+Input:
+  Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJST0xFUyI6...
+
+Proceso:
+  1. Extraer header y payload del token
+  2. RECALCULAR la firma con JWT_SECRET:
+     HMACSHA256(
+       header + payload,
+       "jxgEQe.XHuPq8VdbyYFNkAN.dudQ0903YUn4"
+     )
+     ↓
+     Firma esperada: GCk5CWs70Wf3-zmTI1URArCzaNa1sf7R8cKCvNsjQgY
+  3. Comparar con la firma recibida:
+     GCk5CWs70Wf3... == GCk5CWs70Wf3... ✅
+
+Output:
+  ✅ Token válido → Continúa con el request
+```
+
+---
+
+## 🚨 ¿Qué Pasa Si Alguien Cambia el Token?
+
+### 📝 **Escenario: Hacker Intenta Modificar**
+
+```
+┌─────────────────────────────────────────────┐
+│  TOKEN ORIGINAL                             │
+└─────────────────────────────────────────────┘
+
+Payload:
+{
+  "ROLES": "[VIEW_ACCOUNT]",
+  "sub": "account@debuggeanoideas.com",
+  "iat": 1770589354,
+  "exp": 1770607354
+}
+
+Firma: GCk5CWs70Wf3-zmTI1URArCzaNa1sf7R8cKCvNsjQgY
+
+═════════════════════════════════════════════
+
+┌─────────────────────────────────────────────┐
+│  HACKER MODIFICA EL PAYLOAD                 │
+└─────────────────────────────────────────────┘
+
+Payload modificado:
+{
+  "ROLES": "[VIEW_ACCOUNT, ROLE_ADMIN]", ← ¡Agregó ADMIN!
+  "sub": "account@debuggeanoideas.com",
+  "iat": 1770589354,
+  "exp": 1770607354
+}
+
+Firma (sigue igual): GCk5CWs70Wf3-zmTI1URArCzaNa1sf7R8cKCvNsjQgY
+
+═════════════════════════════════════════════
+
+┌─────────────────────────────────────────────┐
+│  TU SERVIDOR VALIDA EL TOKEN                │
+└─────────────────────────────────────────────┘
+
+1. Recalcula la firma con JWT_SECRET:
+   HMACSHA256(
+     header + PAYLOAD_MODIFICADO,
+     "jxgEQe.XHuPq8VdbyYFNkAN.dudQ0903YUn4"
+   )
+   ↓
+   Nueva firma: XYZ123diferentes456...  ← ¡DISTINTA!
+
+2. Compara firmas:
+   XYZ123diferentes456... ≠ GCk5CWs70Wf3-zmTI1URArCzaNa1sf7R8cKCvNsjQgY
+   ↓
+   ❌ FIRMAS NO COINCIDEN
+
+3. Resultado:
+   SignatureException: "JWT signature does not match"
+   ↓
+   🚫 ACCESO DENEGADO
+```
+
+---
+
+## 🔑 Código Real: ¿Dónde Se Usa `JWT_SECRET`?
+
+### 📋 **En tu `JWTService`**
+
+```java
+@Service
+public class JWTService {
+    // 🔐 TU CLAVE SECRETA
+    public static final String JWT_SECRET = "jxgEQe.XHuPq8VdbyYFNkAN.dudQ0903YUn4";
+
+    // ═══════════════════════════════════════════
+    // 1️⃣ GENERACIÓN DEL TOKEN (Login)
+    // ═══════════════════════════════════════════
+    private String getToken(Map<String, Object> claims, String subject) {
+        // Crear clave de firma con JWT_SECRET
+        final var key = Keys.hmacShaKeyFor(
+            JWT_SECRET.getBytes(StandardCharsets.UTF_8)
+        );
+        //          ↑↑↑↑↑↑↑↑↑↑
+        //      ¡SE USA JWT_SECRET!
+
+        return Jwts.builder()
+            .setClaims(claims)
+            .setSubject(subject)
+            .setIssuedAt(new Date(System.currentTimeMillis()))
+            .setExpiration(new Date(System.currentTimeMillis() + JWT_TOKEN_VALIDITY * 1000))
+            .signWith(key)  // ← Firma con la clave generada
+            //    ↑↑↑
+            // ¡FIRMA EL TOKEN CON JWT_SECRET!
+            .compact();
+    }
+
+    // ═══════════════════════════════════════════
+    // 2️⃣ VALIDACIÓN DEL TOKEN (Requests)
+    // ═══════════════════════════════════════════
+    private Claims getAllClaimsFromToken(String token) {
+        // Crear clave de firma con JWT_SECRET
+        final var key = Keys.hmacShaKeyFor(
+            JWT_SECRET.getBytes(StandardCharsets.UTF_8)
+        );
+        //          ↑↑↑↑↑↑↑↑↑↑
+        //      ¡SE USA JWT_SECRET!
+
+        return Jwts.parserBuilder()
+            .setSigningKey(key)  // ← Valida con la clave generada
+            //         ↑↑↑
+            // ¡VALIDA LA FIRMA CON JWT_SECRET!
+            .build()
+            .parseClaimsJws(token)  // ← Si la firma no coincide → Exception
+            .getBody();
+    }
+}
+```
+
+---
+
+## 📊 Tabla Comparativa: Generación vs Validación
+
+| Proceso | Método | ¿Usa `JWT_SECRET`? | Propósito |
+|---------|--------|-------------------|-----------|
+| **Generación** | `getToken()` | ✅ **SÍ** | Firmar el token |
+| **Validación** | `getAllClaimsFromToken()` | ✅ **SÍ** | Verificar la firma |
+| **Extracción de claims** | `getUsernameFromToken()` | ✅ **SÍ** (internamente) | Parsear el token |
+
+---
+
+## 💡 La Analogía del Sello de Cera
+
+```
+🏰 REY (Tu servidor)
+   │
+   ├─ Tiene un SELLO ÚNICO (JWT_SECRET)
+   │
+   └─ Cuando escribe una CARTA (token):
+      1. Escribe el mensaje (payload)
+      2. SELLA con cera usando su sello único (firma)
+      3. Envía la carta al mensajero (cliente)
+
+📬 MENSAJERO (Cliente)
+   │
+   └─ Guarda la carta sellada (token)
+
+🏰 GUARDIÁN DEL CASTILLO (JwtAuthenticationFilter)
+   │
+   ├─ Cuando el mensajero regresa:
+   │  1. Verifica el SELLO de la carta
+   │  2. Solo el REY tiene ese sello
+   │  3. Si el sello coincide → Carta legítima ✅
+   │  4. Si el sello NO coincide → Carta falsa ❌
+   │
+   └─ NO necesita preguntarle al Rey cada vez
+      (No consulta BD)
+```
+
+---
+
+## 🎯 Resumen Final
+
+```
+┌─────────────────────────────────────────────┐
+│  ¿CÓMO SE RELACIONAN?                       │
+│                                             │
+│  JWT_SECRET                                 │
+│      ↓                                      │
+│  Se usa para FIRMAR el token (login)        │
+│      ↓                                      │
+│  Token: header.payload.FIRMA                │
+│                            ↑                │
+│                    Generada con JWT_SECRET  │
+│      ↓                                      │
+│  Se usa para VALIDAR el token (requests)    │
+│      ↓                                      │
+│  Recalcula la firma con JWT_SECRET          │
+│      ↓                                      │
+│  Compara firma recalculada vs firma del token│
+│      ↓                                      │
+│  Si coinciden → ✅ Token válido             │
+│  Si NO coinciden → ❌ Token falso           │
+└─────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────┐
+│  TU TOKEN:                                  │
+│                                             │
+│  eyJhbGciOiJIUzI1NiJ9.                      │
+│  eyJST0xFUyI6IltWSUVXX0FDQ09VTlRdIiwic3ViOiJhY2NvdW50QGRlYnVnZ2VhbmRvaWVhcy5jb20iLCJpYXQiOjE3NzA1ODkzNTQsImV4cCI6MTc3MDYwNzM1NH0.
+│  GCk5CWs70Wf3-zmTI1URArCzaNa1sf7R8cKCvNsjQgY
+│                    ↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑        │
+│          Esta firma se generó CON tu        │
+│          JWT_SECRET y solo puede validarse  │
+│          CON el mismo JWT_SECRET            │
+└─────────────────────────────────────────────┘
+```
+
+---
+
+## 🔑 Conceptos Clave
+
+```
+✅ JWT_SECRET = Clave secreta para firmar y validar
+✅ La firma del token se genera CON JWT_SECRET
+✅ La firma se valida RECALCULÁNDOLA con JWT_SECRET
+✅ Si alguien modifica el token, la firma NO coincide
+✅ Solo quien conoce JWT_SECRET puede generar tokens válidos
+✅ NO se "compara" directamente, se RECALCULA la firma
+```
+---
+
+# 🚨 ¡IMPORTANTE! - Error de Codificación en `JWT_SECRET`
+
+---
+
+## ❌ Problema Detectado
+
+Tu `JWT_SECRET` tiene una **codificación incorrecta**. El mensaje de error indica:
+
+```
+Invalid base64url string. Use the Base64 encoding using the URL and
+filename-safe character set as defined in Section 5 of RFC 4648.
+```
+
+---
+
+## 🔍 ¿Qué Está Pasando?
+
+Tu clave secreta:
+
+```java
+JWT_SECRET = "jxgEQe.XHuPq8VdbyYFNkAN.dudQ0903YUn4";
+```
+
+Contiene caracteres que **NO son válidos** en **Base64URL**:
+
+| Carácter | ¿Es válido en Base64URL? | Problema |
+|----------|-------------------------|----------|
+| `.` (punto) | ❌ **NO** | Debe ser `-` o `_` |
+
+---
+
+## ✅ Solución 1: Generar una Clave Válida
+
+### 🔐 **Opción A: Usar Base64 Estándar**
+
+Genera una clave con caracteres válidos:
+
+```java
+// Genera una clave segura de 256 bits (32 bytes)
+String validSecret = "jxgEQeXHuPq8VdbyYFNkANdudQ0903YUn4abcdefghij1234567890ABCD";
+//                      ↑ Sin puntos, solo letras/números
+```
+
+### 🔐 **Opción B: Generar Clave Aleatoria (Recomendado)**
+
+Usa este código para generar una clave segura:
+
+```java
+import io.jsonwebtoken.SignatureAlgorithm;
+import io.jsonwebtoken.security.Keys;
+import javax.crypto.SecretKey;
+import java.util.Base64;
+
+public class SecretKeyGenerator {
+    public static void main(String[] args) {
+        // Genera clave de 256 bits (32 bytes)
+        SecretKey key = Keys.secretKeyFor(SignatureAlgorithm.HS256);
+        
+        // Convierte a Base64
+        String base64Key = Base64.getEncoder().encodeToString(key.getEncoded());
+        
+        System.out.println("JWT_SECRET: " + base64Key);
+    }
+}
+```
+
+**Ejemplo de salida:**
+
+```
+JWT_SECRET: 3K9mP2nQ5tR8uV1wY4zA7cE0fH3jL6oN9qS2vX5yB8eG1iM4pT7wZ0dC3fI6k
+```
+
+---
+
+## 🛠️ Solución 2: Usar la Clave Actual con Codificación Correcta
+
+Si quieres mantener tu clave, debes codificarla correctamente:
+
+```java
+@Service
+public class JWTService {
+    public static final long JWT_TOKEN_VALIDITY = 5 * 60 * 60;
+    
+    // ❌ ANTES (con punto)
+    // public static final String JWT_SECRET = "jxgEQe.XHuPq8VdbyYFNkAN.dudQ0903YUn4";
+    
+    // ✅ DESPUÉS (sin puntos, solo letras/números)
+    public static final String JWT_SECRET = "jxgEQeXHuPq8VdbyYFNkANdudQ0903YUn4abcd1234567890";
+    
+    // ...resto del código
+}
+```
+
+---
+
+## 🔐 Solución 3: Usar `application.properties`
+
+**Mejor práctica:** No hardcodear la clave en el código.
+
+### 📝 **1. En `application.properties`:**
+
+```properties
+jwt.secret=jxgEQeXHuPq8VdbyYFNkANdudQ0903YUn4abcd1234567890
+jwt.expiration=18000
+```
+
+### 💻 **2. En `JWTService.java`:**
+
+```java
+@Service
+public class JWTService {
+    @Value("${jwt.secret}")
+    private String JWT_SECRET;
+
+    @Value("${jwt.expiration}")
+    private Long JWT_TOKEN_VALIDITY;
+    
+    // ...resto del código
+}
+```
+
+---
+
+## 🧪 Cómo Verificar que Tu Clave Es Válida
+
+### 🔍 **Usa JWT.io**
+
+1. Ve a [https://jwt.io/](https://jwt.io/)
+2. Pega tu token en el campo **Encoded**
+3. En **Verify Signature**, pega tu `JWT_SECRET`:
+
+```
+jxgEQeXHuPq8VdbyYFNkANdudQ0903YUn4abcd1234567890
+```
+
+4. Si dice **"Signature Verified"** → ✅ Clave válida
+5. Si dice **"Invalid Signature"** → ❌ Clave incorrecta
+
+---
+
+## 📋 Caracteres Válidos en JWT Secret
+
+| Tipo | Caracteres Permitidos |
+|------|----------------------|
+| **Letras mayúsculas** | `A-Z` |
+| **Letras minúsculas** | `a-z` |
+| **Números** | `0-9` |
+| **Símbolos especiales** | `-` (guión), `_` (guion bajo) |
+
+| ❌ **NO Permitidos** | `.` (punto), `,` (coma), `/` (slash), `+` (plus) |
+
+---
+
+## 🚀 Código Corregido Completo
+
+```java
+@Service
+public class JWTService {
+    public static final long JWT_TOKEN_VALIDITY = 5 * 60 * 60;
+    
+    // ✅ Clave válida sin puntos
+    public static final String JWT_SECRET = 
+        "jxgEQeXHuPq8VdbyYFNkANdudQ0903YUn4abcd1234567890ABCDEF";
+    
+    private Claims getAllClaimsFromToken(String token) {
+        final var key = Keys.hmacShaKeyFor(
+            JWT_SECRET.getBytes(StandardCharsets.UTF_8)
+        );
+        
+        return Jwts
+                .parserBuilder()
+                .setSigningKey(key)
+                .build()
+                .parseClaimsJws(token)
+                .getBody();
+    }
+    
+    // ...resto de los métodos sin cambios
+}
+```
+
+---
+
+## 💡 Resumen
+
+```
+┌─────────────────────────────────────────────┐
+│  PROBLEMA:                                  │
+│  JWT_SECRET = "jxg...N.dudQ..."             │
+│                    ↑                        │
+│              Punto (.) no válido            │
+└─────────────────────────────────────────────┘
+                    ↓
+┌─────────────────────────────────────────────┐
+│  SOLUCIÓN:                                  │
+│  JWT_SECRET = "jxg...Ndudq..."              │
+│                    ↑                        │
+│              Sin punto (solo letras/números)│
+└─────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────┐
+│  CARACTERES VÁLIDOS:                        │
+│  ✅ A-Z, a-z, 0-9, -, _                     │
+│  ❌ . , / + = (estos NO)                    │
+└─────────────────────────────────────────────┘
+```
+
+---
+
+## 🎯 Acción Inmediata
+
+1. **Cambia tu `JWT_SECRET`** eliminando los puntos
+2. **Genera nuevos tokens** (los anteriores ya no servirán)
+3. **Pide a los usuarios que hagan login de nuevo**
+
