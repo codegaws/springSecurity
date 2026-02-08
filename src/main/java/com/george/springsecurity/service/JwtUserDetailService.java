@@ -1,4 +1,4 @@
-package com.george.springsecurity.security;
+package com.george.springsecurity.service;
 
 import com.george.springsecurity.repositories.CustomerRepository;
 import lombok.AllArgsConstructor;

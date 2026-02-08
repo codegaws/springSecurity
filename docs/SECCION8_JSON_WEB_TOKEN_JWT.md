@@ -498,4 +498,676 @@ return new User(
     }
 };
 ```
+---
+## 📝 Clase 56 -Configurando Payload(claims) de nuestro usuario JWT 👤👤️‍♂🕵️‍♂🔑 🔑 
+
+## INTRODUCION A QUE ES PAYLOAD(claims) DE JWT
+¡Excelente pregunta! El **PAYLOAD** es una parte fundamental de los **JWT (JSON Web Tokens)** 
+que se usan en Spring Security para autenticación y autorización.
+
+## Estructura de un JWT
+
+Un JWT tiene **3 partes** separadas por puntos (`.`):
+
+```
+HEADER.PAYLOAD.SIGNATURE
+```
+
+### Ejemplo real:
+```
+eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c
+```
+
+## ¿Qué es el PAYLOAD?
+
+El **PAYLOAD** es la **segunda parte** del JWT y contiene la información útil (los datos). Cuando lo decodificas 
+(es Base64, no está encriptado), obtienes un JSON:
+
+```json
+{
+  "sub": "1234567890",           // Subject: identificador del usuario
+  "name": "John Doe",            // Nombre del usuario
+  "email": "john@example.com",   // Email
+  "roles": ["USER", "ADMIN"],    // Roles del usuario
+  "iat": 1516239022,             // Issued At: cuándo se creó
+  "exp": 1516242622              // Expiration: cuándo expira
+}
+```
+
+## ¿Qué son los CLAIMS (reclamaciones)?
+
+Los **claims** son los pares clave-valor dentro del payload. Hay 3 tipos:
+
+### 1. **Registered Claims** (Claims estándar)
+```json
+{
+  "iss": "https://mi-api.com",    // Issuer: quién emitió el token
+  "sub": "user123",                // Subject: de quién es el token
+  "aud": "mi-aplicacion",          // Audience: para quién es el token
+  "exp": 1735689600,               // Expiration: fecha de expiración
+  "iat": 1735603200,               // Issued At: cuándo se creó
+  "nbf": 1735603200                // Not Before: no válido antes de...
+}
+```
+
+### 2. **Public Claims** (Claims públicos registrados)
+```json
+{
+  "name": "María García",
+  "email": "maria@example.com"
+}
+```
+
+### 3. **Private Claims** (Claims personalizados)
+```json
+{
+  "userId": 12345,
+  "department": "IT",
+  "roles": ["ADMIN", "USER"],
+  "permissions": ["read", "write", "delete"]
+}
+```
+
+## Ejemplo en Spring Security
+
+```java
+// Crear un JWT con claims personalizados
+public String generateToken(UserDetails userDetails) {
+    Map<String, Object> claims = new HashMap<>();
+    
+    // Agregar claims personalizados al PAYLOAD
+    claims.put("email", userDetails.getUsername());
+    claims.put("roles", userDetails.getAuthorities());
+    claims.put("userId", 12345);
+    claims.put("department", "IT");
+    
+    return Jwts.builder()
+        .setClaims(claims)                          // PAYLOAD con claims
+        .setSubject(userDetails.getUsername())      // Subject claim
+        .setIssuedAt(new Date())                    // Issued At claim
+        .setExpiration(new Date(System.currentTimeMillis() + 1000 * 60 * 60 * 10)) // Expiration
+        .signWith(getSigningKey(), SignatureAlgorithm.HS256)  // SIGNATURE
+        .compact();
+}
+```
+
+## Extraer información del PAYLOAD
+
+```java
+// Leer claims del JWT
+public String extractUsername(String token) {
+    return extractClaim(token, Claims::getSubject);  // Extrae el "sub"
+}
+
+public Date extractExpiration(String token) {
+    return extractClaim(token, Claims::getExpiration);  // Extrae el "exp"
+}
+
+public <T> T extractClaim(String token, Function<Claims, T> claimsResolver) {
+    final Claims claims = extractAllClaims(token);  // Extrae todo el PAYLOAD
+    return claimsResolver.apply(claims);
+}
+
+private Claims extractAllClaims(String token) {
+    return Jwts.parserBuilder()
+        .setSigningKey(getSigningKey())
+        .build()
+        .parseClaimsJws(token)
+        .getBody();  // ← Aquí está el PAYLOAD completo
+}
+
+// Extraer claim personalizado
+public String extractEmail(String token) {
+    Claims claims = extractAllClaims(token);
+    return claims.get("email", String.class);
+}
+
+public List<String> extractRoles(String token) {
+    Claims claims = extractAllClaims(token);
+    return claims.get("roles", List.class);
+}
+```
+
+## Ejemplo completo en Spring Security
+
+```java
+@Service
+public class JwtService {
+    
+    @Value("${jwt.secret}")
+    private String SECRET_KEY;
+    
+    // Generar token con claims
+    public String generateToken(User user) {
+        Map<String, Object> extraClaims = new HashMap<>();
+        extraClaims.put("userId", user.getId());
+        extraClaims.put("email", user.getEmail());
+        extraClaims.put("roles", user.getRoles());
+        
+        return createToken(extraClaims, user.getUsername());
+    }
+    
+    private String createToken(Map<String, Object> claims, String subject) {
+        return Jwts.builder()
+            .setClaims(claims)              // PAYLOAD: claims personalizados
+            .setSubject(subject)            // PAYLOAD: subject
+            .setIssuedAt(new Date())        // PAYLOAD: iat
+            .setExpiration(new Date(System.currentTimeMillis() + 1000 * 60 * 60 * 24)) // PAYLOAD: exp
+            .signWith(getSignInKey(), SignatureAlgorithm.HS256)  // SIGNATURE
+            .compact();
+    }
+    
+    // Validar token
+    public boolean isTokenValid(String token, UserDetails userDetails) {
+        final String username = extractUsername(token);
+        return (username.equals(userDetails.getUsername())) && !isTokenExpired(token);
+    }
+    
+    private boolean isTokenExpired(String token) {
+        return extractExpiration(token).before(new Date());
+    }
+}
+```
+
+## Visualización
+
+```
+┌─────────────────────────────────────────────────────┐
+│                      JWT TOKEN                       │
+├─────────────────────────────────────────────────────┤
+│ HEADER                                              │
+│ { "alg": "HS256", "typ": "JWT" }                   │
+├─────────────────────────────────────────────────────┤
+│ PAYLOAD (Claims) ← AQUÍ ESTÁ LA INFO DEL USUARIO   │
+│ {                                                   │
+│   "sub": "usuario123",         (Subject)           │
+│   "email": "user@example.com", (Custom)            │
+│   "roles": ["ADMIN", "USER"],  (Custom)            │
+│   "iat": 1735603200,           (Issued At)         │
+│   "exp": 1735689600            (Expiration)        │
+│ }                                                   │
+├─────────────────────────────────────────────────────┤
+│ SIGNATURE                                           │
+│ HMACSHA256(base64(header) + "." + base64(payload)) │
+└─────────────────────────────────────────────────────┘
+```
+
+## Resumen
+
+- **PAYLOAD** = La parte del JWT que contiene los datos
+- **CLAIMS** = Los pares clave-valor dentro del payload
+- **No está encriptado** (solo Base64), así que no pongas información sensible como contraseñas
+- **La SIGNATURE protege la integridad** del payload (detecta si fue modificado)
+
+---
+# CODIGO DE LA CLASE 56
+
+```java
+@Service
+public class JWTService {
+    public static final long JWT_TOKEN_VALIDITY = 5 * 60 * 60;
+    public static final String JWT_SECRET = "jxgEQe.XHuPq8VdbyYFNkAN.dudQ0903YUn4";
+
+    private Claims getAllClaimsFromToken(String token) {
+        final var key = Keys.hmacShaKeyFor(JWT_SECRET.getBytes(StandardCharsets.UTF_8));
+        return Jwts
+                .parserBuilder()
+                .setSigningKey(key)
+                .build()
+                .parseClaimsJws(token)
+                .getBody();
+    }
+
+    public <T> T getClaimsFromToken(String token, Function<Claims, T> claimsResolver) {
+        final var claims = this.getAllClaimsFromToken(token);
+        return claimsResolver.apply(claims);
+    }
+}
+
+```
+# 🔐 Explicación Detallada: `JWTService`
+
+---
+
+## 🎯 ¿Qué hace este servicio?
+
+Este servicio es el **desencriptador de tokens JWT**. Toma un token JWT (que es como un sobre cerrado con información) y extrae los datos que contiene de forma segura.
+
+---
+
+## 🧩 Anatomía Completa del Servicio
+
+```java
+@Service
+public class JWTService {
+    // ⏱️ Constante: Tiempo de validez (5 horas)
+    public static final long JWT_TOKEN_VALIDITY = 5 * 60 * 60;
+    
+    // 🔑 Constante: Clave secreta para firmar/validar tokens
+    public static final String JWT_SECRET = "jxgEQe.XHuPq8VdbyYFNkAN.dudQ0903YUn4";
+
+    // 🔓 Método privado: Extrae TODOS los claims del token
+    private Claims getAllClaimsFromToken(String token) {
+        final var key = Keys.hmacShaKeyFor(JWT_SECRET.getBytes(StandardCharsets.UTF_8));
+        return Jwts
+                .parserBuilder()
+                .setSigningKey(key)
+                .build()
+                .parseClaimsJws(token)
+                .getBody();
+    }
+
+    // 🎯 Método público: Extrae UN claim específico usando una función
+    public <T> T getClaimsFromToken(String token, Function<Claims, T> claimsResolver) {
+        final var claims = this.getAllClaimsFromToken(token);
+        return claimsResolver.apply(claims);
+    }
+}
+```
+
+---
+
+## 📊 Constantes del Servicio
+
+| Constante | Valor | ¿Para qué sirve? | Formato |
+|-----------|-------|------------------|---------|
+| `JWT_TOKEN_VALIDITY` | `18000` | ⏱️ Duración del token (5 horas en segundos) | `Long` |
+| `JWT_SECRET` | `"jxgEQe..."` | 🔑 Clave para firmar y validar tokens | `String` |
+
+### 🧮 Cálculo de `JWT_TOKEN_VALIDITY`:
+```
+5 horas × 60 minutos × 60 segundos = 18,000 segundos
+```
+
+---
+
+## 🔍 Análisis de los Dos Métodos
+
+### 🔓 **MÉTODO #1: `getAllClaimsFromToken()`**
+
+#### 📋 **Propósito:**
+Desencripta el token y extrae **TODOS** los claims (información) que contiene.
+
+#### 🎯 **Características:**
+- **Visibilidad:** `private` (solo lo usa esta clase)
+- **Retorna:** `Claims` (objeto con toda la info del token)
+- **Validación:** Si el token es inválido → lanza excepción
+
+#### 📦 **Proceso Paso a Paso:**
+
+```java
+private Claims getAllClaimsFromToken(String token) {
+    // 1️⃣ Convierte el secreto en clave criptográfica
+    final var key = Keys.hmacShaKeyFor(JWT_SECRET.getBytes(StandardCharsets.UTF_8));
+    
+    // 2️⃣ Construye el parser del token
+    return Jwts.parserBuilder()
+            .setSigningKey(key)      // 3️⃣ Configura la clave de validación
+            .build()                  // 4️⃣ Construye el parser
+            .parseClaimsJws(token)    // 5️⃣ Valida y parsea el token
+            .getBody();               // 6️⃣ Extrae el cuerpo (claims)
+}
+```
+
+| Paso | Código | ¿Qué hace? |
+|------|--------|------------|
+| **1️⃣** | `Keys.hmacShaKeyFor(...)` | 🔑 Convierte el string secreto en clave HMAC-SHA |
+| **2️⃣** | `Jwts.parserBuilder()` | 🏗️ Crea el constructor del parser |
+| **3️⃣** | `.setSigningKey(key)` | 🔐 Configura la clave para validar la firma |
+| **4️⃣** | `.build()` | ✅ Construye el parser configurado |
+| **5️⃣** | `.parseClaimsJws(token)` | 🔍 Valida firma y parsea el token |
+| **6️⃣** | `.getBody()` | 📦 Extrae el payload (claims) |
+
+---
+
+### 🎯 **MÉTODO #2: `getClaimsFromToken()`**
+
+#### 📋 **Propósito:**
+Extrae **UN DATO ESPECÍFICO** del token usando una función personalizada.
+
+#### 🎯 **Características:**
+- **Visibilidad:** `public` (otros servicios pueden usarlo)
+- **Genérico:** `<T>` puede retornar cualquier tipo
+- **Flexible:** Usa `Function<Claims, T>` para extraer lo que necesites
+
+#### 📦 **Proceso Paso a Paso:**
+
+```java
+public <T> T getClaimsFromToken(String token, Function<Claims, T> claimsResolver) {
+    // 1️⃣ Obtiene TODOS los claims del token
+    final var claims = this.getAllClaimsFromToken(token);
+    
+    // 2️⃣ Aplica la función para extraer el claim específico
+    return claimsResolver.apply(claims);
+}
+```
+
+| Paso | Código | ¿Qué hace? |
+|------|--------|------------|
+| **1️⃣** | `getAllClaimsFromToken(token)` | 📦 Obtiene todos los claims |
+| **2️⃣** | `claimsResolver.apply(claims)` | 🎯 Extrae el dato específico según la función |
+
+---
+
+## 🎨 Diagrama de Flujo Completo
+
+```
+🎫 TOKEN JWT
+   "eyJhbGciOiJIUzI1NiIs..."
+        │
+        ▼
+   🔓 getAllClaimsFromToken()
+        │
+        ├─── 1️⃣ JWT_SECRET → 🔑 Clave HMAC-SHA
+        │
+        ├─── 2️⃣ Jwts.parserBuilder()
+        │         │
+        │         ├─── setSigningKey(key)
+        │         ├─── build()
+        │         └─── parseClaimsJws(token)
+        │
+        ├─── ✅ VÁLIDO
+        │      │
+        │      ▼
+        │   📦 Claims {
+        │       sub: "alice@mail.com",
+        │       exp: 1735689600,
+        │       iat: 1735671600,
+        │       roles: ["ROLE_USER", "ROLE_ADMIN"]
+        │   }
+        │
+        ├─── ❌ INVÁLIDO
+        │      │
+        │      ▼
+        │   🚫 JwtException
+        │
+        ▼
+   🎯 getClaimsFromToken(token, claimsResolver)
+        │
+        ├─── 📦 Obtiene todos los claims
+        │
+        └─── 🎯 Aplica función específica
+               │
+               ├─── Claims::getSubject → "alice@mail.com"
+               ├─── Claims::getExpiration → Date
+               └─── Claims::get("roles") → List<String>
+```
+
+---
+
+## 🧪 Ejemplos Prácticos con Datos Reales
+
+### 📝 **Ejemplo 1: Estructura de un Token JWT**
+
+```
+🎫 TOKEN JWT (codificado):
+eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.
+eyJzdWIiOiJhbGljZUBtYWlsLmNvbSIsImV4cCI6MTczNTY4OTYwMCwiaWF0IjoxNzM1NjcxNjAwLCJyb2xlcyI6WyJST0xFX1VTRVIiLCJST0xFX0FETUlOIl19.
+SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c
+
+┌─────────────┬──────────────────────┬────────────────┐
+│   HEADER    │       PAYLOAD        │   SIGNATURE    │
+│  (Algoritmo)│   (Claims/Datos)     │  (Validación)  │
+└─────────────┴──────────────────────┴────────────────┘
+```
+
+### 📦 **Ejemplo 2: Claims Decodificados**
+
+```json
+{
+  "sub": "alice@mail.com",           // 👤 Usuario
+  "exp": 1735689600,                 // ⏱️ Expiración (timestamp)
+  "iat": 1735671600,                 // 📅 Fecha de emisión
+  "roles": ["ROLE_USER", "ROLE_ADMIN"] // 🔐 Roles
+}
+```
+
+---
+
+## 💻 Ejemplos de Uso en Otros Servicios
+
+### 🎯 **Caso 1: Extraer el Email del Usuario**
+
+```java
+// En otro servicio (por ejemplo, AuthService)
+@Autowired
+private JWTService jwtService;
+
+public String getUserEmail(String token) {
+    // 📧 Extrae el "subject" (email) del token
+    return jwtService.getClaimsFromToken(token, Claims::getSubject);
+}
+
+// Resultado: "alice@mail.com"
+```
+
+### 🎯 **Caso 2: Extraer la Fecha de Expiración**
+
+```java
+public Date getExpirationDate(String token) {
+    // ⏱️ Extrae la fecha de expiración
+    return jwtService.getClaimsFromToken(token, Claims::getExpiration);
+}
+
+// Resultado: Tue Jan 01 00:00:00 UTC 2025
+```
+
+### 🎯 **Caso 3: Extraer un Claim Personalizado**
+
+```java
+public List<String> getUserRoles(String token) {
+    // 🔐 Extrae un claim personalizado
+    return jwtService.getClaimsFromToken(
+        token, 
+        claims -> claims.get("roles", List.class)
+    );
+}
+
+// Resultado: ["ROLE_USER", "ROLE_ADMIN"]
+```
+
+### 🎯 **Caso 4: Validar si el Token Expiró**
+
+```java
+public boolean isTokenExpired(String token) {
+    Date expiration = jwtService.getClaimsFromToken(token, Claims::getExpiration);
+    // ⏰ Compara la fecha de expiración con la actual
+    return expiration.before(new Date());
+}
+
+// Resultado: true (expiró) o false (aún válido)
+```
+
+---
+
+## 🧠 Cuadro Comparativo de los Métodos
+
+| Aspecto | `getAllClaimsFromToken()` | `getClaimsFromToken()` |
+|---------|---------------------------|------------------------|
+| **Visibilidad** | 🔒 `private` | 🌐 `public` |
+| **Propósito** | Extrae **todos** los claims | Extrae **un** claim específico |
+| **Retorno** | `Claims` (objeto completo) | `<T>` (tipo genérico) |
+| **Uso directo** | ❌ No (método interno) | ✅ Sí (desde otros servicios) |
+| **Validación** | ✅ Valida firma del token | ✅ Reutiliza validación del método privado |
+| **Flexibilidad** | ⚠️ Devuelve todo | 🎯 Personalizable con `Function` |
+
+---
+
+## 🔄 ¿Por Qué Dos Métodos en Lugar de Uno?
+
+### 🎯 **Principio de Responsabilidad Única:**
+
+```
+🔓 getAllClaimsFromToken()
+   ↓ Responsabilidad: Validar y desencriptar el token
+   
+🎯 getClaimsFromToken()
+   ↓ Responsabilidad: Extraer datos específicos de forma flexible
+```
+
+### 📚 **Ventajas del Diseño:**
+
+| Ventaja | Descripción |
+|---------|-------------|
+| **🔄 Reutilización** | `getAllClaimsFromToken()` se usa internamente múltiples veces |
+| **🎯 Flexibilidad** | `getClaimsFromToken()` permite extraer cualquier claim sin duplicar código |
+| **🔒 Encapsulación** | La lógica de validación está oculta (método privado) |
+| **🧹 Clean Code** | Cada método tiene una responsabilidad clara |
+
+---
+
+## 🛡️ Validaciones que Realiza `parseClaimsJws()`
+
+Cuando llamas a `parseClaimsJws(token)`, JJWT valida automáticamente:
+
+| Validación | ¿Qué verifica? | Excepción si falla |
+|------------|----------------|-------------------|
+| **🔐 Firma** | ¿El token fue firmado con `JWT_SECRET`? | `SignatureException` |
+| **⏱️ Expiración** | ¿El token ya expiró? | `ExpiredJwtException` |
+| **📅 Not Before** | ¿El token ya es válido? | `PrematureJwtException` |
+| **📝 Formato** | ¿El token tiene formato correcto? | `MalformedJwtException` |
+
+---
+
+## 🎓 Conceptos Clave para Estudiantes
+
+### 📚 **Claims:** ¿Qué son?
+
+```
+🎯 Claims = Afirmaciones sobre el usuario guardadas en el token
+
+Tipos comunes:
+- sub (subject): 👤 Identificador del usuario
+- exp (expiration): ⏱️ Cuándo expira el token
+- iat (issued at): 📅 Cuándo se creó el token
+- custom claims: 🎨 Datos personalizados (roles, permisos, etc.)
+```
+
+### 🔑 **HMAC-SHA:** ¿Qué es?
+
+```
+🔐 HMAC-SHA = Algoritmo de firma criptográfica
+
+Componentes:
+- HMAC: Hash-based Message Authentication Code
+- SHA: Secure Hash Algorithm
+
+Función:
+✅ Garantiza que el token NO fue modificado
+✅ Solo quien tiene JWT_SECRET puede crear tokens válidos
+```
+
+### 🎯 **Function<Claims, T>:** ¿Qué es?
+
+```
+🧩 Function = Interfaz funcional de Java 8
+
+Estructura:
+Function<INPUT, OUTPUT>
+
+En este caso:
+Function<Claims, T>
+   ↓        ↓
+  INPUT   OUTPUT
+(Claims) (Cualquier tipo)
+
+Ejemplo:
+Claims::getSubject → Function<Claims, String>
+```
+
+---
+
+## 📊 Flujo Completo de Validación de Token
+
+```
+1️⃣ CLIENTE
+   ↓ Envía request con header:
+   Authorization: Bearer eyJhbGciOiJIUzI1NiIs...
+
+2️⃣ FILTRO DE SEGURIDAD
+   ↓ Extrae el token del header
+
+3️⃣ JWTService.getClaimsFromToken()
+   ↓ Llama internamente a:
+   
+4️⃣ JWTService.getAllClaimsFromToken()
+   ├─── 🔑 Convierte JWT_SECRET en clave
+   ├─── 🔍 Valida la firma
+   ├─── ⏱️ Verifica que no expiró
+   └─── 📦 Extrae los claims
+
+5️⃣ SI VÁLIDO ✅
+   ↓ Retorna los claims
+   ↓ Spring Security autentica al usuario
+   ↓ Permite acceso al recurso
+
+6️⃣ SI INVÁLIDO ❌
+   ↓ Lanza JwtException
+   ↓ Retorna 401 Unauthorized
+```
+
+---
+
+## 🚀 Métodos Adicionales que Podrías Añadir
+
+```java
+// ⏰ Validar si el token expiró
+public boolean isTokenExpired(String token) {
+    Date expiration = getClaimsFromToken(token, Claims::getExpiration);
+    return expiration.before(new Date());
+}
+
+// 👤 Obtener el username del token
+public String getUsernameFromToken(String token) {
+    return getClaimsFromToken(token, Claims::getSubject);
+}
+
+// 🆔 Obtener el ID del token
+public String getIdFromToken(String token) {
+    return getClaimsFromToken(token, Claims::getId);
+}
+
+// 🔐 Obtener roles del token
+public List<String> getRolesFromToken(String token) {
+    return getClaimsFromToken(token, claims -> claims.get("roles", List.class));
+}
+```
+
+---
+
+## ✅ Resumen Visual
+
+```
+🔐 JWTService tiene DOS métodos:
+
+┌────────────────────────────────────────┐
+│  🔓 getAllClaimsFromToken()            │
+│  ➤ Privado                             │
+│  ➤ Valida y desencripta el token       │
+│  ➤ Retorna TODOS los claims           │
+└────────────────────────────────────────┘
+                 ↓ usa
+┌────────────────────────────────────────┐
+│  🎯 getClaimsFromToken()               │
+│  ➤ Público                             │
+│  ➤ Extrae UN claim específico          │
+│  ➤ Usa Function<Claims, T> para        │
+│     flexibilidad                       │
+└────────────────────────────────────────┘
+
+📌 Flujo típico:
+Token → getAllClaims → Valida → getClaim → Dato específico
+```
+
+---
+
+## 🎯 Para Recordar:
+
+```
+✅ getAllClaimsFromToken() = Abre el sobre (desencripta)
+✅ getClaimsFromToken() = Lee un dato específico del sobre
+✅ Claims = Información guardada en el token
+✅ JWT_SECRET = Llave para abrir/validar el sobre
+✅ Function<Claims, T> = Extractor personalizable
+```
 
