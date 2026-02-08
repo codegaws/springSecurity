@@ -6,6 +6,7 @@ import io.jsonwebtoken.security.Keys;
 import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
+import java.util.Date;
 import java.util.function.Function;
 
 @Service
@@ -26,5 +27,9 @@ public class JWTService {
     public <T> T getClaimsFromToken(String token, Function<Claims, T> claimsResolver) {
         final var claims = this.getAllClaimsFromToken(token);
         return claimsResolver.apply(claims);
+    }
+
+    private Date getExpirationDateFromToken(String token) {
+        return this.getClaimsFromToken(token, Claims::getExpiration);
     }
 }

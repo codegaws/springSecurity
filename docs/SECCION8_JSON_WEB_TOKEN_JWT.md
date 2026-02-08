@@ -847,6 +847,432 @@ public <T> T getClaimsFromToken(String token, Function<Claims, T> claimsResolver
 | **1️⃣** | `getAllClaimsFromToken(token)` | 📦 Obtiene todos los claims |
 | **2️⃣** | `claimsResolver.apply(claims)` | 🎯 Extrae el dato específico según la función |
 
+# 🧩 Explicación Detallada: `Function<Claims, T>` en Java
+
+---
+
+## 🎯 ¿Qué es `Function<Claims, T>`?
+
+`Function` es una **interfaz funcional** de Java 8 que representa una función que:
+- 📥 **Recibe** un parámetro de tipo `Claims`
+- 📤 **Retorna** un valor de tipo `T` (genérico)
+
+---
+
+## 📚 Anatomía de `Function<Input, Output>`
+
+```java
+Function<Claims, T> claimsResolver
+         ↓       ↓
+      ENTRADA  SALIDA
+     (Claims)   (T)
+```
+
+| Parte | Significado |
+|-------|-------------|
+| `Function` | 🧩 Interfaz funcional de `java.util.function` |
+| `<Claims, T>` | 📦 Tipos genéricos: entrada y salida |
+| `claimsResolver` | 🏷️ Nombre de la variable |
+
+---
+
+## 🔍 La Interfaz `Function` por Dentro
+
+```java
+@FunctionalInterface
+public interface Function<T, R> {
+    R apply(T t);  // Método abstracto único
+}
+```
+
+### 📋 Traducido a tu caso:
+
+```java
+Function<Claims, T> claimsResolver
+    ↓
+T apply(Claims claims) {
+    // Extrae algo del objeto Claims
+    return ...;
+}
+```
+
+---
+
+## 🎨 Diagrama del Flujo
+
+```
+🎫 TOKEN
+    ↓
+getAllClaimsFromToken(token)
+    ↓
+📦 Claims {
+    sub: "alice@mail.com",
+    exp: 1735689600,
+    iat: 1735671600
+}
+    ↓
+claimsResolver.apply(claims)  ← 🎯 Function se ejecuta aquí
+    ↓
+🎯 RESULTADO (tipo T)
+```
+
+---
+
+## 💡 ¿Cómo se Usa en tu Método?
+
+```java
+public <T> T getClaimsFromToken(String token, Function<Claims, T> claimsResolver) {
+    final var claims = this.getAllClaimsFromToken(token);  // 1️⃣ Obtiene todos los claims
+    return claimsResolver.apply(claims);                    // 2️⃣ Aplica la función
+}
+```
+
+### 🧪 Ejemplo Real:
+
+```java
+// Cuando llamas al método desde otro lugar:
+String email = jwtService.getClaimsFromToken(token, Claims::getSubject);
+                                                      ↑
+                                            Esto es el Function
+```
+
+---
+
+## 🎯 Tres Formas de Pasar un `Function`
+
+### ✅ **Forma 1: Reference Method (Referencia a Método)**
+
+```java
+// 📧 Extraer el subject (email)
+String email = getClaimsFromToken(token, Claims::getSubject);
+                                          ↑
+                        Esto es: claims -> claims.getSubject()
+```
+
+### ✅ **Forma 2: Lambda Expression**
+
+```java
+// 🔐 Extraer un claim personalizado
+List<String> roles = getClaimsFromToken(token, 
+    claims -> claims.get("roles", List.class)
+);
+```
+
+### ✅ **Forma 3: Implementación Explícita** (antigua)
+
+```java
+List<String> roles = getClaimsFromToken(token, new Function<Claims, List<String>>() {
+    @Override
+    public List<String> apply(Claims claims) {
+        return claims.get("roles", List.class);
+    }
+});
+```
+
+---
+
+## 📊 Tabla Comparativa de las 3 Formas
+
+| Forma | Sintaxis | Cuándo usarla |
+|-------|----------|---------------|
+| **Method Reference** | `Claims::getSubject` | ✅ Cuando usas un método existente |
+| **Lambda** | `claims -> claims.get("roles")` | ✅ Cuando necesitas lógica personalizada |
+| **Clase Anónima** | `new Function<>() {...}` | ⚠️ Código antiguo (antes de Java 8) |
+
+---
+
+## 🧪 Ejemplos Prácticos Completos
+
+### 📧 **Ejemplo 1: Extraer el Email (Subject)**
+
+```java
+// En tu servicio de autenticación:
+public String getUserEmail(String token) {
+    return jwtService.getClaimsFromToken(token, Claims::getSubject);
+    //                                           ↑
+    //                    Function<Claims, String>
+}
+
+// Resultado: "alice@mail.com"
+```
+
+#### 🔍 **Desglose:**
+
+```java
+Claims::getSubject
+    ↓ equivale a:
+claims -> claims.getSubject()
+    ↓ equivale a:
+new Function<Claims, String>() {
+    public String apply(Claims claims) {
+        return claims.getSubject();
+    }
+}
+```
+
+---
+
+### ⏱️ **Ejemplo 2: Extraer la Fecha de Expiración**
+
+```java
+public Date getExpirationDate(String token) {
+    return jwtService.getClaimsFromToken(token, Claims::getExpiration);
+    //                                           ↑
+    //                    Function<Claims, Date>
+}
+
+// Resultado: Tue Jan 01 00:00:00 UTC 2025
+```
+
+---
+
+### 🔐 **Ejemplo 3: Extraer Claim Personalizado (Roles)**
+
+```java
+public List<String> getUserRoles(String token) {
+    return jwtService.getClaimsFromToken(token, 
+        claims -> claims.get("roles", List.class)
+        //  ↑
+        //  Function<Claims, List<String>>
+    );
+}
+
+// Resultado: ["ROLE_USER", "ROLE_ADMIN"]
+```
+
+---
+
+### 🆔 **Ejemplo 4: Extraer el ID del Token**
+
+```java
+public String getTokenId(String token) {
+    return jwtService.getClaimsFromToken(token, Claims::getId);
+    //                                           ↑
+    //                    Function<Claims, String>
+}
+
+// Resultado: "550e8400-e29b-41d4-a716-446655440000"
+```
+
+---
+
+## 🎓 ¿Por Qué Usar `Function` en Lugar de Métodos Separados?
+
+### ❌ **Sin Function (Código Repetitivo):**
+
+```java
+// Tendrías que crear un método para cada claim:
+public String getSubjectFromToken(String token) {
+    return getAllClaimsFromToken(token).getSubject();
+}
+
+public Date getExpirationFromToken(String token) {
+    return getAllClaimsFromToken(token).getExpiration();
+}
+
+public String getIdFromToken(String token) {
+    return getAllClaimsFromToken(token).getId();
+}
+// ... 10 métodos más para cada claim
+```
+
+### ✅ **Con Function (Flexible y Reutilizable):**
+
+```java
+// Un solo método que hace TODO:
+public <T> T getClaimsFromToken(String token, Function<Claims, T> claimsResolver) {
+    final var claims = this.getAllClaimsFromToken(token);
+    return claimsResolver.apply(claims);
+}
+
+// Úsalo para cualquier claim:
+getClaimsFromToken(token, Claims::getSubject);    // String
+getClaimsFromToken(token, Claims::getExpiration); // Date
+getClaimsFromToken(token, Claims::getId);         // String
+getClaimsFromToken(token, c -> c.get("roles"));   // Object
+```
+
+---
+
+## 🧠 Cuadro Explicativo del Genérico `<T>`
+
+```java
+public <T> T getClaimsFromToken(...)
+       ↓   ↓
+   Declaración │
+             Retorno
+```
+
+| Parte | Significado | Ejemplo |
+|-------|-------------|---------|
+| `<T>` antes del retorno | 📢 Declaración del tipo genérico | Indica que `T` es un tipo |
+| `T` como retorno | 📤 El método retorna tipo `T` | Puede ser `String`, `Date`, `List`, etc. |
+| `Function<Claims, T>` | 🎯 La función retorna tipo `T` | `T` se deduce del `claimsResolver` |
+
+---
+
+## 🔄 Flujo Completo con Ejemplo Real
+
+```
+1️⃣ LLAMADA AL MÉTODO:
+   String email = getClaimsFromToken(token, Claims::getSubject);
+                                             ↑
+                              Function<Claims, String>
+
+2️⃣ DENTRO DEL MÉTODO:
+   public <T> T getClaimsFromToken(String token, Function<Claims, T> claimsResolver) {
+       // T se deduce como String
+       final var claims = getAllClaimsFromToken(token);
+       return claimsResolver.apply(claims);  // Llama a Claims::getSubject
+   }
+
+3️⃣ EJECUCIÓN DE LA FUNCIÓN:
+   claims.getSubject()  // Retorna "alice@mail.com"
+
+4️⃣ RESULTADO:
+   email = "alice@mail.com"
+```
+
+---
+
+## 📚 Interfaces Funcionales Relacionadas
+
+| Interfaz | Estructura | Cuándo usarla | Ejemplo |
+|----------|------------|---------------|---------|
+| `Function<T, R>` | `T → R` | Transformar entrada en salida | `Claims::getSubject` |
+| `Predicate<T>` | `T → boolean` | Validar/filtrar | `claims -> claims.getExpiration().after(new Date())` |
+| `Consumer<T>` | `T → void` | Procesar sin retornar | `claims -> log.info(claims.getSubject())` |
+| `Supplier<T>` | `() → T` | Generar valor sin entrada | `() -> new Date()` |
+
+---
+
+## 🎯 Métodos Comunes de `Claims` que Puedes Usar
+
+```java
+Claims claims = getAllClaimsFromToken(token);
+
+// 📋 Métodos estándar:
+claims.getSubject()      // 👤 "alice@mail.com"
+claims.getExpiration()   // ⏱️ Date
+claims.getIssuedAt()     // 📅 Date
+claims.getId()           // 🆔 String
+claims.getIssuer()       // 🏢 String
+claims.getAudience()     // 👥 String
+
+// 🎨 Métodos personalizados:
+claims.get("roles")               // Object (raw)
+claims.get("roles", List.class)   // List<String>
+claims.get("userId", Integer.class) // Integer
+```
+
+---
+
+## 🚀 Implementación Completa Recomendada
+
+```java
+@Service
+public class JWTService {
+    public static final long JWT_TOKEN_VALIDITY = 5 * 60 * 60;
+    public static final String JWT_SECRET = "jxgEQe.XHuPq8VdbyYFNkAN.dudQ0903YUn4";
+
+    // 🔓 Método privado base
+    private Claims getAllClaimsFromToken(String token) {
+        final var key = Keys.hmacShaKeyFor(JWT_SECRET.getBytes(StandardCharsets.UTF_8));
+        return Jwts.parserBuilder()
+                .setSigningKey(key)
+                .build()
+                .parseClaimsJws(token)
+                .getBody();
+    }
+
+    // 🎯 Método genérico flexible
+    public <T> T getClaimsFromToken(String token, Function<Claims, T> claimsResolver) {
+        final var claims = this.getAllClaimsFromToken(token);
+        return claimsResolver.apply(claims);
+    }
+
+    // ⏱️ Métodos de conveniencia (usan Function internamente)
+    public Date getExpirationDateFromToken(String token) {
+        return getClaimsFromToken(token, Claims::getExpiration);
+    }
+
+    public String getUsernameFromToken(String token) {
+        return getClaimsFromToken(token, Claims::getSubject);
+    }
+
+    public boolean isTokenExpired(String token) {
+        Date expiration = getExpirationDateFromToken(token);
+        return expiration.before(new Date());
+    }
+
+    public List<String> getRolesFromToken(String token) {
+        return getClaimsFromToken(token, claims -> claims.get("roles", List.class));
+    }
+}
+```
+
+---
+
+## 💡 Casos de Uso Adicionales
+
+### 🔍 **Extraer Múltiples Claims en un Objeto:**
+
+```java
+public UserInfo extractUserInfo(String token) {
+    return getClaimsFromToken(token, claims -> new UserInfo(
+        claims.getSubject(),
+        claims.get("name", String.class),
+        claims.get("roles", List.class)
+    ));
+}
+```
+
+### ⚡ **Validación Personalizada:**
+
+```java
+public boolean isTokenValid(String token, String expectedEmail) {
+    return getClaimsFromToken(token, claims -> 
+        claims.getSubject().equals(expectedEmail) && 
+        claims.getExpiration().after(new Date())
+    );
+}
+```
+
+---
+
+## ✅ Resumen Visual
+
+```
+📦 Function<Claims, T>
+   ↓
+┌──────────────────────────────────────┐
+│  🎯 Representa una función que:      │
+│  ➤ Recibe: Claims                    │
+│  ➤ Retorna: Tipo T (genérico)       │
+└──────────────────────────────────────┘
+   ↓
+📝 Tres formas de escribirla:
+   ├─ Claims::getSubject (Method Reference)
+   ├─ claims -> claims.getSubject() (Lambda)
+   └─ new Function<>() {...} (Clase Anónima)
+   ↓
+✅ Ventajas:
+   ➤ Código flexible y reutilizable
+   ➤ Evita duplicar métodos
+   ➤ Permite extraer cualquier claim
+```
+
+---
+
+## 🎓 Para Recordar:
+
+```
+✅ Function<A, B> = Función que transforma A en B
+✅ Claims::getSubject = Atajo para: claims -> claims.getSubject()
+✅ apply() = Método que ejecuta la función
+✅ <T> = Tipo genérico que se deduce automáticamente
+✅ claimsResolver = Variable que guarda la función
+```
 ---
 
 ## 🎨 Diagrama de Flujo Completo
@@ -1170,4 +1596,468 @@ Token → getAllClaims → Valida → getClaim → Dato específico
 ✅ JWT_SECRET = Llave para abrir/validar el sobre
 ✅ Function<Claims, T> = Extractor personalizable
 ```
+---
 
+## 📝 Clase 57 - Configurando el tiempo de caducidad a nuestro JWT 👤👤🕵️‍♂🕵️‍♂🔑 🔑 
+
+# 🔍 Explicación Detallada: Métodos de Extracción de Claims
+
+---
+
+## 🎯 Método #1: `getClaimsFromToken()` - El Método Genérico Flexible
+
+### 📋 Firma del Método
+
+```java
+public <T> T getClaimsFromToken(String token, Function<Claims, T> claimsResolver)
+```
+
+---
+
+## 🧩 Desglose Completo del Método Genérico
+
+### 📊 Tabla de Componentes
+
+| Componente | Tipo | Descripción |
+|------------|------|-------------|
+| `<T>` | Declaración de genérico | 📢 Define que `T` es un tipo variable |
+| `T` (retorno) | Tipo genérico | 📤 El método retorna tipo `T` |
+| `String token` | Parámetro 1 | 🎫 Token JWT a procesar |
+| `Function<Claims, T> claimsResolver` | Parámetro 2 | 🎯 Función que extrae el claim específico |
+
+---
+
+## 🔄 Flujo de Ejecución Paso a Paso
+
+```java
+public <T> T getClaimsFromToken(String token, Function<Claims, T> claimsResolver) {
+    // 1️⃣ Extrae TODOS los claims del token
+    final var claims = this.getAllClaimsFromToken(token);
+    
+    // 2️⃣ Aplica la función personalizada para extraer UN claim específico
+    return claimsResolver.apply(claims);
+}
+```
+
+### 📊 Tabla del Flujo
+
+| Paso | Acción | Entrada | Salida |
+|------|--------|---------|--------|
+| **1️⃣** | `getAllClaimsFromToken(token)` | Token JWT (String) | `Claims` (objeto completo) |
+| **2️⃣** | `claimsResolver.apply(claims)` | `Claims` | Tipo `T` (dato específico) |
+
+---
+
+## 🎨 Diagrama Visual del Flujo
+
+```
+🎫 TOKEN JWT"eyJhbGciOiJIUzI1NiIs..."
+        ↓
+   [getAllClaimsFromToken(token)]
+        ↓
+   📦 Claims {
+       sub: "alice@mail.com",
+       exp: 1735689600,
+       iat: 1735671600,
+       roles: ["ROLE_USER", "ROLE_ADMIN"]
+   }
+        ↓
+   [claimsResolver.apply(claims)]
+        ↓
+   🎯 Resultado Tipo T
+      (String, Date, List, etc.)
+```
+
+---
+
+## 🧪 Ejemplos Prácticos del Método Genérico
+
+### ✅ **Ejemplo 1: Extraer Email (String)**
+
+```java
+// Llamada:
+String email = getClaimsFromToken(token, Claims::getSubject);
+
+// Internamente:
+Claims claims = getAllClaimsFromToken(token); // {sub: "alice@mail.com", ...}
+return Claims::getSubject.apply(claims);      // "alice@mail.com"
+
+// Resultado: "alice@mail.com"
+```
+
+### ✅ **Ejemplo 2: Extraer Fecha de Expiración (Date)**
+
+```java
+// Llamada:
+Date expiration = getClaimsFromToken(token, Claims::getExpiration);
+
+// Internamente:
+Claims claims = getAllClaimsFromToken(token); // {exp: 1735689600, ...}
+return Claims::getExpiration.apply(claims);   // Date object
+
+// Resultado: Tue Jan 01 00:00:00 UTC 2025
+```
+
+### ✅ **Ejemplo 3: Extraer Roles (List)**
+
+```java
+// Llamada:
+List<String> roles = getClaimsFromToken(token, claims -> claims.get("roles", List.class));
+
+// Internamente:
+Claims claims = getAllClaimsFromToken(token); // {roles: ["ROLE_USER", "ROLE_ADMIN"], ...}
+return claims.get("roles", List.class);        // ["ROLE_USER", "ROLE_ADMIN"]
+
+// Resultado: ["ROLE_USER", "ROLE_ADMIN"]
+```
+
+---
+
+## 🎯 Método #2: `getExpirationDateFromToken()` - Método de Conveniencia
+
+### 📋 Firma del Método
+
+```java
+private Date getExpirationDateFromToken(String token)
+```
+
+---
+
+## 🧩 Desglose Completo del Método de Conveniencia
+
+### 📊 Tabla de Componentes
+
+| Componente | Tipo | Descripción |
+|------------|------|-------------|
+| `private` | Modificador | 🔒 Solo se usa dentro de esta clase |
+| `Date` | Tipo de retorno | ⏱️ Siempre retorna un objeto `Date` |
+| `String token` | Parámetro | 🎫 Token JWT a procesar |
+
+---
+
+## 🔄 Flujo de Ejecución
+
+```java
+private Date getExpirationDateFromToken(String token) {
+    // Reutiliza el método genérico con Claims::getExpiration
+    return this.getClaimsFromToken(token, Claims::getExpiration);
+}
+```
+
+### 📊 Tabla del Flujo
+
+| Paso | Método Llamado | Entrada | Salida |
+|------|---------------|---------|--------|
+| **1️⃣** | `getClaimsFromToken()` | Token + `Claims::getExpiration` | `Date` |
+| **2️⃣** | `getAllClaimsFromToken()` | Token | `Claims` |
+| **3️⃣** | `Claims::getExpiration` | `Claims` | `Date` |
+
+---
+
+## 🎨 Diagrama Visual del Flujo
+
+```
+🎫 TOKEN JWT↓
+   [getExpirationDateFromToken(token)]
+        ↓
+   [getClaimsFromToken(token, Claims::getExpiration)]
+        ↓
+   [getAllClaimsFromToken(token)]
+        ↓
+   📦 Claims { exp: 1735689600, ... }
+        ↓
+   [Claims::getExpiration.apply(claims)]
+        ↓
+   ⏱️ Date (Tue Jan 01 00:00:00 UTC 2025)
+```
+
+---
+
+## 🧪 Ejemplo Completo con Datos Reales
+
+### 📋 Escenario: Token con Información de Usuario
+
+```json
+// Token JWT decodificado (payload):
+{
+  "sub": "alice@mail.com",
+  "exp": 1735689600,
+  "iat": 1735671600,
+  "roles": ["ROLE_USER", "ROLE_ADMIN"]
+}
+```
+
+### 🔍 Ejecución de `getExpirationDateFromToken()`
+
+```java
+// 1️⃣ Llamada al método
+Date expiration = getExpirationDateFromToken(token);
+
+// 2️⃣ Internamente llama a:
+getClaimsFromToken(token, Claims::getExpiration)
+
+// 3️⃣ Que a su vez:
+Claims claims = getAllClaimsFromToken(token)
+// Retorna: {sub: "alice@mail.com", exp: 1735689600, iat: 1735671600, roles: [...]}
+
+// 4️⃣ Luego aplica:
+Claims::getExpiration.apply(claims)
+// Retorna: Date(1735689600000)
+
+// 5️⃣ Resultado final:
+// Tue Jan 01 00:00:00 UTC 2025
+```
+
+---
+
+## 🔀 Comparación: Método Genérico vs. Método de Conveniencia
+
+| Aspecto | `getClaimsFromToken()` | `getExpirationDateFromToken()` |
+|---------|------------------------|--------------------------------|
+| **Visibilidad** | 🌐 `public` | 🔒 `private` |
+| **Flexibilidad** | 🎯 Alta (acepta cualquier función) | ⚠️ Baja (solo extrae expiración) |
+| **Tipo de retorno** | 📦 Genérico `<T>` | ⏱️ Fijo `Date` |
+| **Parámetros** | 2 (token + función) | 1 (solo token) |
+| **Propósito** | 🔧 Reutilizable para cualquier claim | 🎯 Específico para fecha de expiración |
+| **Uso típico** | Desde otras clases | Solo interno (dentro de `JWTService`) |
+
+---
+
+## 📚 Métodos de Conveniencia Adicionales (Recomendados)
+
+```java
+// ⏱️ Obtener fecha de emisión
+private Date getIssuedAtFromToken(String token) {
+    return this.getClaimsFromToken(token, Claims::getIssuedAt);
+}
+
+// 👤 Obtener subject (username/email)
+public String getUsernameFromToken(String token) {
+    return this.getClaimsFromToken(token, Claims::getSubject);
+}
+
+// 🆔 Obtener ID del token
+private String getIdFromToken(String token) {
+    return this.getClaimsFromToken(token, Claims::getId);
+}
+
+// 🏢 Obtener emisor
+private String getIssuerFromToken(String token) {
+    return this.getClaimsFromToken(token, Claims::getIssuer);
+}
+
+// 👥 Obtener audiencia
+private String getAudienceFromToken(String token) {
+    return this.getClaimsFromToken(token, Claims::getAudience);
+}
+
+// 🔐 Obtener roles personalizados
+public List<String> getRolesFromToken(String token) {
+    return this.getClaimsFromToken(token, claims -> claims.get("roles", List.class));
+}
+```
+
+---
+
+## 🎯 ¿Por Qué Usar Este Patrón?
+
+### ✅ **Ventajas del Diseño**
+
+| Ventaja | Descripción |
+|---------|-------------|
+| **🔄 Reutilización** | Un método genérico sirve para todos los claims |
+| **🧹 Código Limpio** | Evita duplicación de lógica |
+| **🎯 Especialización** | Métodos de conveniencia para casos comunes |
+| **🔒 Encapsulación** | Métodos internos privados |
+| **🧪 Testeable** | Fácil de probar cada componente |
+
+---
+
+## 🧠 Concepto Clave: Method Reference
+
+### 📝 **Claims::getExpiration** explicado
+
+```java
+// 1️⃣ Method Reference (forma corta)
+Claims::getExpiration
+
+// 2️⃣ Lambda equivalente (forma media)
+claims -> claims.getExpiration()
+
+// 3️⃣ Clase anónima (forma larga/antigua)
+new Function<Claims, Date>() {
+    @Override
+    public Date apply(Claims claims) {
+        return claims.getExpiration();
+    }
+}
+```
+
+### 🎯 Todas son equivalentes, pero **Method Reference** es:
+- ✅ Más legible
+- ✅ Más concisa
+- ✅ La forma moderna (Java 8+)
+
+---
+
+## 🔄 Flujo Completo de Validación de Token
+
+```
+┌─────────────────────────────────────────────────┐
+│            FLUJO DE VALIDACIÓN JWT              │
+└─────────────────────────────────────────────────┘
+
+1️⃣ Cliente envía request con header:
+   Authorization: Bearer eyJhbGciOiJIUzI1NiIs...
+        ↓
+2️⃣ Filtro de seguridad extrae el token
+        ↓
+3️⃣ Llama a métodos de JWTService:
+        ↓
+   ┌──────────────────────────────┐
+   │ getUsernameFromToken(token)  │ → "alice@mail.com"
+   ├──────────────────────────────┤
+   │ getExpirationDateFromToken() │ → Date(2025-01-01)
+   ├──────────────────────────────┤
+   │ getRolesFromToken(token)     │ → ["ROLE_USER", "ROLE_ADMIN"]
+   └──────────────────────────────┘
+        ↓
+4️⃣ Todos usan internamente:
+   getClaimsFromToken(token, function)
+        ↓
+5️⃣ Que llama a:
+   getAllClaimsFromToken(token)
+        ↓
+6️⃣ Si válido: ✅ Continúa con el request
+   Si inválido: ❌ Retorna 401 Unauthorized
+```
+
+---
+
+## 🚀 Implementación Completa Recomendada
+
+```java
+@Service
+public class JWTService {
+    public static final long JWT_TOKEN_VALIDITY = 5 * 60 * 60;
+    public static final String JWT_SECRET = "jxgEQe.XHuPq8VdbyYFNkAN.dudQ0903YUn4";
+
+    // 🔓 Método privado base
+    private Claims getAllClaimsFromToken(String token) {
+        final var key = Keys.hmacShaKeyFor(JWT_SECRET.getBytes(StandardCharsets.UTF_8));
+        return Jwts.parserBuilder()
+                .setSigningKey(key)
+                .build()
+                .parseClaimsJws(token)
+                .getBody();
+    }
+
+    // 🎯 Método genérico flexible (PÚBLICO)
+    public <T> T getClaimsFromToken(String token, Function<Claims, T> claimsResolver) {
+        final var claims = this.getAllClaimsFromToken(token);
+        return claimsResolver.apply(claims);
+    }
+
+    // ⏱️ Métodos de conveniencia (PRIVADOS/PÚBLICOS según necesidad)
+    
+    // PRIVADO: solo se usa internamente
+    private Date getExpirationDateFromToken(String token) {
+        return this.getClaimsFromToken(token, Claims::getExpiration);
+    }
+
+    // PÚBLICO: se usa desde otros servicios
+    public String getUsernameFromToken(String token) {
+        return this.getClaimsFromToken(token, Claims::getSubject);
+    }
+
+    // PÚBLICO: validación común
+    public boolean isTokenExpired(String token) {
+        Date expiration = this.getExpirationDateFromToken(token);
+        return expiration.before(new Date());
+    }
+
+    // PÚBLICO: extraer roles
+    public List<String> getRolesFromToken(String token) {
+        return this.getClaimsFromToken(token, claims -> claims.get("roles", List.class));
+    }
+}
+```
+
+---
+
+## 💡 Casos de Uso Prácticos
+
+### 🔍 **Caso 1: Validar Token en un Filtro**
+
+```java
+@Component
+public class JwtAuthenticationFilter extends OncePerRequestFilter {
+    @Autowired
+    private JWTService jwtService;
+
+    @Override
+    protected void doFilterInternal(HttpServletRequest request, ...) {
+        String token = extractTokenFromRequest(request);
+        
+        // Extrae username
+        String username = jwtService.getUsernameFromToken(token);
+        
+        // Valida expiración
+        if (!jwtService.isTokenExpired(token)) {
+            // Token válido, continúa
+        }
+    }
+}
+```
+
+### 🔍 **Caso 2: Autorización por Roles**
+
+```java
+@Service
+public class AuthorizationService {
+    @Autowired
+    private JWTService jwtService;
+
+    public boolean hasRole(String token, String requiredRole) {
+        List<String> roles = jwtService.getRolesFromToken(token);
+        return roles.contains(requiredRole);
+    }
+}
+```
+
+---
+
+## ✅ Resumen Visual
+
+```
+📦 getClaimsFromToken(token, function)
+   ↓
+┌─────────────────────────────────────────┐
+│  🎯 Método GENÉRICO y FLEXIBLE          │
+│  ➤ Acepta cualquier función             │
+│  ➤ Retorna tipo genérico <T>            │
+│  ➤ Reutilizable para todos los claims   │
+└─────────────────────────────────────────┘
+   ↓
+⏱️ getExpirationDateFromToken(token)
+   ↓
+┌─────────────────────────────────────────┐
+│  🎯 Método de CONVENIENCIA              │
+│  ➤ Caso específico (expiración)         │
+│  ➤ Retorna Date fijo                    │
+│  ➤ Reutiliza el método genérico         │
+└─────────────────────────────────────────┘
+```
+
+---
+
+## 🎓 Para Recordar
+
+```
+✅ getClaimsFromToken() = Método genérico flexible
+✅ <T> = Tipo genérico que se deduce automáticamente
+✅ Function<Claims, T> = Función que transforma Claims en T
+✅ getExpirationDateFromToken() = Atajo específico
+✅ Claims::getExpiration = Method Reference (forma corta)
+✅ Patrón: Un método genérico + varios de conveniencia
+```
