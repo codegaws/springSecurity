@@ -3,6 +3,7 @@ package com.george.springsecurity.service;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
@@ -31,5 +32,22 @@ public class JWTService {
 
     private Date getExpirationDateFromToken(String token) {
         return this.getClaimsFromToken(token, Claims::getExpiration);//claims->claims.getExpiration()
+    }
+
+    private Boolean isTokenExpired(String token) {
+        final var expirationDate = this.getExpirationDateFromToken(token);
+        return expirationDate.before(new Date());
+    }
+
+    private String getUsernameFromToken(String token) {
+        return this.getClaimsFromToken(token, Claims::getSubject);//claims->claims.getSubject()
+    }
+
+    //validar que el token sea real
+    public Boolean validateToken(String token, UserDetails userDetails) {
+        final var usernameFromUserDetails = userDetails.getUsername();
+        final var usernameFromJWT = this.getUsernameFromToken(token);
+
+        return (usernameFromUserDetails.equals(usernameFromJWT) && !this.isTokenExpired(token));
     }
 }

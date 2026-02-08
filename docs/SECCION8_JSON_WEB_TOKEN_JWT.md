@@ -2459,3 +2459,414 @@ public class AuthorizationService {
 ✅ Claims::getExpiration = Method Reference (forma corta)
 ✅ Patrón: Un método genérico + varios de conveniencia
 ```
+# 🔐 Explicación de Métodos de Validación JWT
+
+---
+
+## 📋 Visión General
+
+Estos tres métodos trabajan juntos para **validar** que un token JWT sea legítimo y no haya expirado.
+
+---
+
+## 1️⃣ `isTokenExpired()` - Verificar Expiración
+
+### 🎯 **Propósito**
+Verifica si el token JWT **ya caducó** comparando su fecha de expiración con la fecha actual.
+
+### 💻 **Código**
+```java
+private Boolean isTokenExpired(String token) {
+    final var expirationDate = this.getExpirationDateFromToken(token);
+    return expirationDate.before(new Date());
+}
+```
+
+### 🔍 **¿Qué Hace Paso a Paso?**
+
+```
+1️⃣ Extrae la fecha de expiración del token
+   expirationDate = getExpirationDateFromToken(token)
+   Ejemplo: 2024-01-15 14:30:00
+
+2️⃣ Obtiene la fecha/hora actual
+   new Date()
+   Ejemplo: 2024-01-15 10:00:00
+
+3️⃣ Compara: ¿expirationDate es ANTES que ahora?
+   expirationDate.before(new Date())
+   ✅ true  → Token EXPIRADO (la fecha de exp ya pasó)
+   ❌ false → Token VÁLIDO (aún no expira)
+```
+
+### 📊 **Ejemplo Visual**
+
+```
+┌─────────────────────────────────────────────┐
+│         LÍNEA DE TIEMPO                     │
+└─────────────────────────────────────────────┘
+
+Caso 1: Token EXPIRADO ❌
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        [...]                   ↑ Ahora (10:00)
+        14:30                   
+    expirationDate              
+
+    expirationDate.before(new Date()) = TRUE
+    [...]
+
+Caso 2: Token VÁLIDO ✅
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    ↑ Ahora (10:00)             [...]
+    10:00                       14:30
+                           expirationDate
+
+    expirationDate.before(new Date()) = FALSE
+    ✅ El token aún es válido
+```
+
+---
+
+## 2️⃣ `getUsernameFromToken()` - Extraer Username
+
+### 🎯 **Propósito**
+Extrae el **username** (o email) almacenado en el token JWT.
+
+### 💻 **Código**
+```java
+private String getUsernameFromToken(String token) {
+    return this.getClaimsFromToken(token, Claims::getSubject);
+}
+```
+
+### 🔍 **¿Qué Hace?**
+
+```
+1️⃣ Llama al método genérico getClaimsFromToken()
+
+2️⃣ Pasa como parámetro: Claims::getSubject
+   (Method reference que extrae el "subject" del token)
+
+3️⃣ El "subject" en JWT es típicamente el username/email
+
+4️⃣ Retorna: "alice@mail.com" (por ejemplo)
+```
+
+### 📦 **Estructura del Token JWT**
+
+```json
+{
+  "sub": "alice@mail.com",    ← Claims.getSubject() extrae ESTO
+  "iat": 1705318800,
+  "exp": 1705336800,
+  "authorities": ["ROLE_USER", "ROLE_ADMIN"]
+}
+```
+
+### 🔄 **Alternativa sin Method Reference**
+
+```java
+private String getUsernameFromToken(String token) {
+    return this.getClaimsFromToken(token, claims -> claims.getSubject());
+}
+```
+
+---
+
+## 3️⃣ `validateToken()` - Validación Completa
+
+### 🎯 **Propósito**
+Valida que el token sea **auténtico** y **no haya expirado**.
+
+### 💻 **Código**
+```java
+public Boolean validateToken(String token, UserDetails userDetails) {
+    final var usernameFromUserDetails = userDetails.getUsername();
+    final var usernameFromJWT = this.getUsernameFromToken(token);
+
+    return (usernameFromUserDetails.equals(usernameFromJWT) && !this.isTokenExpired(token));
+}
+```
+
+### 🔍 **¿Qué Valida?**
+
+| Validación | Método Usado | ¿Qué Verifica? |
+|------------|--------------|----------------|
+| **1️⃣ Usuario Correcto** | `getUsernameFromToken()` | ¿El username del token coincide con el usuario autenticado? |
+| **2️⃣ Token No Expirado** | `isTokenExpired()` | ¿El token aún está vigente? |
+
+### 📊 **Flujo de Validación**
+
+```
+┌──────────────────────────────────────────────┐
+│  ENTRADA: Token JWT + UserDetails           │
+└──────────────────────────────────────────────┘
+                    [...]
+        ┌───────────────────────────┐
+        │ 1️⃣ Extraer Username        │
+        │    del UserDetails        │
+        │    [...]
+        │    "alice@mail.com"       │
+        └───────────────────────────┘
+                    [...]
+        ┌───────────────────────────┐
+        │ 2️⃣ Extraer Username        │
+        │    del Token JWT          │
+        │    [...]
+        │    getUsernameFromToken() │
+        │    [...]
+        │    "alice@mail.com"       │
+        └───────────────────────────┘
+                    [...]
+        ┌───────────────────────────┐
+        │ 3️⃣ ¿Coinciden?             │
+        │    "alice@mail.com" ==    │
+        │    "alice@mail.com"       │
+        │    [...]
+        │    ✅ SÍ                   │
+        └───────────────────────────┘
+                    [...]
+        ┌───────────────────────────┐
+        │ 4️⃣ ¿Token Expirado?        │
+        │    isTokenExpired(token)  │
+        │    [...]
+        │    ❌ NO                   │
+        └───────────────────────────┘
+                    [...]
+        ┌───────────────────────────┐
+        │ 5️⃣ Resultado Final         │
+        │    true && !false         │
+        │    [...]
+        │    ✅ TOKEN VÁLIDO         │
+        └───────────────────────────┘
+```
+
+### 🎯 **Lógica de Validación**
+
+```java
+return (usernameFromUserDetails.equals(usernameFromJWT) && !this.isTokenExpired(token));
+       │                                                 │
+       └─ Condición 1: Usernames coinciden ────────────┘
+                                                          │
+                    └─ Condición 2: Token NO expirado ──┘
+```
+
+### 📋 **Casos de Validación**
+
+| Username Coincide | Token Expirado | Resultado | Motivo |
+|-------------------|----------------|-----------|--------|
+| ✅ **SÍ** | ❌ **NO** | ✅ **VÁLIDO** | Todo correcto |
+| ✅ **SÍ** | ✅ **SÍ** | ❌ **INVÁLIDO** | Token caducado |
+| ❌ **NO** | ❌ **NO** | ❌ **INVÁLIDO** | Usuario no coincide |
+| ❌ **NO** | ✅ **SÍ** | ❌ **INVÁLIDO** | Ambas condiciones fallan |
+
+---
+
+## 🔄 Flujo Completo de Validación
+
+```
+┌─────────────────────────────────────────────┐
+│  CLIENTE ENVÍA PETICIÓN CON TOKEN           │
+│  GET /api/admin/users                       │
+│  Authorization: Bearer eyJhbGc...           │
+└─────────────────────────────────────────────┘
+                    [...]
+        ┌───────────────────────────┐
+        │ JwtAuthenticationFilter   │
+        │ [...]
+        │ Extrae el token del header│
+        └───────────────────────────┘
+                    [...]
+        ┌───────────────────────────┐
+        │ getUsernameFromToken()    │
+        │ [...]
+        │ Extrae: "alice@mail.com"  │
+        └───────────────────────────┘
+                    [...]
+        ┌───────────────────────────┐
+        │ UserDetailsService        │
+        │ [...]
+        │ Carga UserDetails de BD   │
+        └───────────────────────────┘
+                    [...]
+        ┌───────────────────────────┐
+        │ validateToken()           │
+        │ [...]
+        │ ¿Username correcto?       │
+        │ [...]
+        │ ¿Token no expirado?       │
+        └───────────────────────────┘
+                    [...]
+    ┌─────────────┐      ┌─────────────┐
+    │ ✅ VÁLIDO   │      │ ❌ INVÁLIDO │
+    │             │      │             │
+    │ Continúa    │      │ Retorna     │
+    │ la petición │      │ 403/401     │
+    └─────────────┘      └─────────────┘
+```
+
+---
+
+## 🧪 Ejemplo Práctico Completo
+
+### 📝 **Escenario: Usuario Autenticado**
+
+```java
+// 1️⃣ Token JWT recibido
+String token = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhbGljZUBtYWlsLmNvbSIsImV4cCI6MTcwNTMzNjgwMH0...";
+
+// 2️⃣ UserDetails cargado desde BD
+UserDetails userDetails = new User(
+    "alice@mail.com",
+    "$2a$10abc...",
+    authorities
+);
+
+// 3️⃣ Llamada a validateToken()
+Boolean isValid = jwtService.validateToken(token, userDetails);
+
+// ═══════════════════════════════════════
+// DENTRO DEL MÉTODO validateToken()
+// ═══════════════════════════════════════
+
+// Paso 1: Extraer username de UserDetails
+String usernameFromUserDetails = "alice@mail.com";
+
+// Paso 2: Extraer username del token JWT
+String usernameFromJWT = getUsernameFromToken(token);
+// → Llama a getClaimsFromToken(token, Claims::getSubject)
+// → Retorna: "alice@mail.com"
+
+// Paso 3: Verificar expiración
+Boolean expired = isTokenExpired(token);
+// → getExpirationDateFromToken(token) retorna: 2024-01-15 14:30:00
+// → new Date() es: 2024-01-15 10:00:00
+// → expirationDate.before(new Date()) = false
+// → Token NO expirado ✅
+
+// Paso 4: Validación final
+return ("alice@mail.com".equals("alice@mail.com") && !false);
+//      (true && true)
+//      ✅ true → TOKEN VÁLIDO
+```
+
+---
+
+## 🎨 Diagrama de Interacción
+
+```
+┌──────────────────────────────────────────────┐
+│           validateToken()                    │
+│                                              │
+│  ┌────────────────────────────────────────┐ │
+│  │ 1. getUsernameFromToken(token)         │ │
+│  │    [...]
+│  │    [...]
+│  │    getClaimsFromToken(token,           │ │
+│  │        Claims::getSubject)             │ │
+│  │    [...]
+│  │    [...]
+│  │    getAllClaimsFromToken(token)        │ │
+│  │    [...]
+│  │    Parsea JWT y retorna Claims         │ │
+│  │    [...]
+│  │    [...]
+│  │    Retorna claims.getSubject()         │ │
+│  │    [...]
+│  │    "alice@mail.com"                    │ │
+│  └────────────────────────────────────────┘ │
+│                                              │
+│  ┌────────────────────────────────────────┐ │
+│  │ 2. isTokenExpired(token)               │ │
+│  │    [...]
+│  │    [...]
+│  │    getExpirationDateFromToken(token)   │ │
+│  │    [...]
+│  │    [...]
+│  │    getClaimsFromToken(token,           │ │
+│  │        Claims::getExpiration)          │ │
+│  │    [...]
+│  │    Date: 2024-01-15 14:30:00           │ │
+│  │    [...]
+│  │    [...]
+│  │    expirationDate.before(new Date())   │ │
+│  │    [...]
+│  │    false (no expiró)                   │ │
+│  └────────────────────────────────────────┘ │
+│                                              │
+│  ┌────────────────────────────────────────┐ │
+│  │ 3. Comparación Final                   │ │
+│  │    [...]
+│  │    "alice@mail.com" == "alice@mail.com"│ │
+│  │    true                                │ │
+│  │    [...]
+│  │    !false = true                       │ │
+│  │    [...]
+│  │    true && true = ✅ TRUE              │ │
+│  └────────────────────────────────────────┘ │
+│                                              │
+│  🔓 Token Válido - Acceso Permitido          │
+└──────────────────────────────────────────────┘
+```
+
+---
+
+## 🚨 Casos de Error
+
+### ❌ **Error 1: Username No Coincide**
+
+```java
+// Token contiene: "bob@mail.com"
+// UserDetails contiene: "alice@mail.com"
+
+validateToken(token, userDetails)
+// → "alice@mail.com".equals("bob@mail.com") = false
+// → false && true = ❌ FALSE
+// → Token inválido (posible ataque/token robado)
+```
+
+### ❌ **Error 2: Token Expirado**
+
+```java
+// Token expira: 2024-01-15 09:00:00
+// Fecha actual: 2024-01-15 10:00:00
+
+validateToken(token, userDetails)
+// → usernameFromUserDetails.equals(usernameFromJWT) = true
+// → isTokenExpired(token) = true
+// → true && !true = true && false = ❌ FALSE
+// → Token inválido (caducado)
+```
+
+---
+
+## 🔑 Conceptos Clave
+
+```
+✅ isTokenExpired()      → ⏰ Verifica tiempo de vida del token
+✅ getUsernameFromToken() → 👤 Extrae el identificador del usuario
+✅ validateToken()        → 🔐 Valida AMBAS condiciones
+✅ Claims.getSubject()    → 📝 Campo estándar JWT para username
+✅ Claims.getExpiration() → 📅 Campo estándar JWT para fecha exp
+✅ .before()              → 📊 Método de Date para comparar fechas
+```
+
+---
+
+## 💡 ¿Por Qué Validar Ambas Cosas?
+
+| Validación | Previene |
+|------------|----------|
+| **Username coincide** | 🚫 Tokens robados o manipulados |
+| **Token no expirado** | 🚫 Tokens antiguos/caducados |
+
+```
+🛡️ Seguridad en Capas:
+
+Capa 1: ¿El token es para ESTE usuario?
+Capa 2: ¿El token aún es VÁLIDO temporalmente?
+
+Ambas deben ser TRUE para autorizar la petición
+```
+
+## 📝 Clase 58 - Configurando el tiempo de caducidad a nuestro JWT 👤👤🕵️‍♂🕵️‍♂🔑 🔑 
