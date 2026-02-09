@@ -5580,3 +5580,451 @@ public class JWTService {
 2. **Genera nuevos tokens** (los anteriores ya no servirán)
 3. **Pide a los usuarios que hagan login de nuevo**
 
+
+----
+
+## 📝 Clase 64 - 65 - 66 - VALIDANDO NUESTRO JWT EN EL PROCESO DE AUTORIZACION PARTE 1 👤👤🕵️‍♂🕵️‍♂🔑 🔑
+
+```java
+@Component
+@AllArgsConstructor
+public class JWTValidationfilter {
+
+    private final JWTService jwtService;
+    private final JWTUserDetailService jwtUserDetailService;
+}
+
+```
+
+### ¿Para qué se usa `@Component` en ese contexto?
+
+## ¿Qué es `@Component`?
+
+`@Component` es una anotación de **Spring Framework** que le indica a Spring que esa clase 
+debe ser gestionada como un **bean** dentro del contenedor de inversión de control (IoC). Es decir, Spring se encargará de:
+
+1. **Crear una instancia** de esa clase automáticamente al iniciar la aplicación.
+2. **Inyectar sus dependencias** (en este caso `jwtService` y `jwtUserDetailService`).
+3. **Gestionar su ciclo de vida**.
+
+## Desglose de tu código
+
+```java
+@Component          // 1️⃣ Registra esta clase como un bean de Spring
+@AllArgsConstructor  // 2️⃣ Lombok genera un constructor con todos los campos
+public class JWTValidationfilter {
+
+    private final JWTService jwtService;               // 3️⃣ Inyectado por Spring
+    private final JWTUserDetailService jwtUserDetailService; // 3️⃣ Inyectado por Spring
+}
+```
+
+| Anotación | Función |
+|---|---|
+| `@Component` | Marca la clase para que Spring la detecte durante el **component scanning** y la registre como bean. |
+| `@AllArgsConstructor` | Genera un constructor con **todos los campos** (`jwtService`, `jwtUserDetailService`), 
+lo cual permite la **inyección por constructor**. |
+
+## ¿Por qué `@Component` y no `@Service`, `@Repository` o `@Controller`?
+
+Todas estas anotaciones son **especializaciones** de `@Component`:
+
+```
+@Component          → Bean genérico
+  ├── @Service      → Lógica de negocio
+  ├── @Repository   → Acceso a datos
+  ├── @Controller   → Controladores web
+  └── @Configuration → Clases de configuración
+```
+
+En este caso se usa `@Component` porque `JWTValidationfilter` es un **filtro de validación JWT**,
+que no encaja exactamente en las categorías de `@Service`, `@Repository` ni `@Controller`. 
+Es un componente de infraestructura/seguridad genérico.
+
+## ¿Qué pasaría sin `@Component`?
+
+Sin `@Component`, Spring **no sabría que debe crear** una instancia de `JWTValidationfilter`, 
+y al intentar usarlo obtendrías un error como:
+
+```
+No qualifying bean of type 'JWTValidationfilter' available
+```
+
+## Flujo simplificado
+
+```
+1. Spring inicia → escanea paquetes buscando @Component (y derivadas)
+2. Encuentra JWTValidationfilter con @Component
+3. Ve que necesita JWTService y JWTUserDetailService (por el constructor)
+4. Busca esos beans en el contenedor, los encuentra y los inyecta
+5. JWTValidationfilter queda listo para usarse ✅
+```
+
+### En resumen
+
+`@Component` es necesario para que Spring **detecte, instancie y gestione** automáticamente tu 
+filtro JWT, permitiendo que las dependencias (`jwtService` y `jwtUserDetailService`) se inyecten 
+sin que tú tengas que crearlas manualmente con `new`.
+
+## BORRAMOS EL MYAUTHENTICATION LA CLASE POR QUE AHORA NOS LOGUAMOS CON JWT
+
+---
+
+# 🔐 `JWTValidationFilter`: Flujo Completo y Detallado
+
+---
+
+## 🎯 ¿Por Qué Se Implementa Este Filtro?
+
+```
+┌─────────────────────────────────────────────┐
+│  🚪 PROBLEMA: Proteger Endpoints            │
+│                                             │
+│  Sin JWT:                                   │
+│  GET /api/accounts → ❌ Cualquiera accede   │
+│                                             │
+│  Con JWT:                                   │
+│  GET /api/accounts                          │
+│  Authorization: Bearer TOKEN                │
+│  → ✅ Solo usuarios autenticados            │
+└─────────────────────────────────────────────┘
+```
+
+---
+
+## 🔄 Flujo Completo: De Login a Endpoint Protegido
+
+```
+┌─────────────────────────────────────────────┐
+│  1️⃣ USUARIO HACE LOGIN                      │
+│  POST /authenticate                         │
+│  {                                          │
+│    "username": "account@example.com",       │
+│    "password": "password123"                │
+│  }                                          │
+└─────────────────────────────────────────────┘
+                    ↓
+┌─────────────────────────────────────────────┐
+│  2️⃣ SERVIDOR GENERA TOKEN                   │
+│  JWTService.generateToken(userDetails)      │
+│                                             │
+│  Response:                                  │
+│  {                                          │
+│    "jwt": "eyJhbGci...GCk5CWs70Wf3..."      │
+│  }                                          │
+└─────────────────────────────────────────────┘
+                    ↓
+┌─────────────────────────────────────────────┐
+│  3️⃣ USUARIO GUARDA EL TOKEN                 │
+│  Token almacenado en:                       │
+│  - LocalStorage (frontend)                  │
+│  - Postman (para testing)                   │
+└─────────────────────────────────────────────┘
+                    ↓
+┌─────────────────────────────────────────────┐
+│  4️⃣ USUARIO ACCEDE A ENDPOINT PROTEGIDO     │
+│  GET /api/accounts                          │
+│  Authorization: Bearer eyJhbGci...          │
+└─────────────────────────────────────────────┘
+                    ↓
+┌─────────────────────────────────────────────┐
+│  5️⃣ JWTValidationFilter SE EJECUTA          │
+│  → Aquí comienza el filtro                  │
+└─────────────────────────────────────────────┘
+```
+
+---
+
+## 🔍 Flujo Interno de `JWTValidationFilter`
+
+### 📋 **Paso a Paso**
+
+```
+┌─────────────────────────────────────────────┐
+│  🔸 ENTRADA: HttpServletRequest              │
+│  GET /api/accounts                          │
+│  Authorization: Bearer eyJhbGci...          │
+└─────────────────────────────────────────────┘
+                    ↓
+┌─────────────────────────────────────────────┐
+│  ①  EXTRAER HEADER "Authorization"          │
+│                                             │
+│  final var requestTokenHeader =             │
+│      request.getHeader("Authorization");    │
+│                                             │
+│  Resultado:                                 │
+│  "Bearer eyJhbGciOiJIUzI1NiJ9..."           │
+└─────────────────────────────────────────────┘
+                    ↓
+┌─────────────────────────────────────────────┐
+│  ②  VALIDAR QUE EMPIECE CON "Bearer "       │
+│                                             │
+│  if (requestTokenHeader != null &&          │
+│      requestTokenHeader.startsWith("Bearer"))│
+│                                             │
+│  ✅ Sí empieza con "Bearer "                │
+└─────────────────────────────────────────────┘
+                    ↓
+┌─────────────────────────────────────────────┐
+│  ③  EXTRAER EL TOKEN (sin "Bearer ")        │
+│                                             │
+│  jwt = requestTokenHeader.substring(7);     │
+│                                             │
+│  Resultado:                                 │
+│  "eyJhbGciOiJIUzI1NiJ9.eyJST0xFUyI6..."     │
+└─────────────────────────────────────────────┘
+                    ↓
+┌─────────────────────────────────────────────┐
+│  ④  EXTRAER USERNAME DEL TOKEN              │
+│                                             │
+│  try {                                      │
+│    username = jwtService.getUsernameFromToken(jwt);│
+│  }                                          │
+│                                             │
+│  Resultado:                                 │
+│  "account@debuggeanoideas.com"              │
+│                                             │
+│  ⚠️ EXCEPCIONES:                            │
+│  - IllegalArgumentException → Token vacío   │
+│  - ExpiredJwtException → Token expirado     │
+└─────────────────────────────────────────────┘
+                    ↓
+┌─────────────────────────────────────────────┐
+│  ⑤  VERIFICAR SI YA ESTÁ AUTENTICADO        │
+│                                             │
+│  if (username != null &&                    │
+│      SecurityContextHolder.getContext()     │
+│          .getAuthentication() == null)      │
+│                                             │
+│  ✅ Username existe                         │
+│  ✅ No hay autenticación previa             │
+└─────────────────────────────────────────────┘
+                    ↓
+┌─────────────────────────────────────────────┐
+│  ⑥  CARGAR DETALLES DEL USUARIO             │
+│                                             │
+│  final var userDetails =                    │
+│      jwtUserDetailService                   │
+│          .loadUserByUsername(username);     │
+│                                             │
+│  Resultado:                                 │
+│  UserDetails {                              │
+│    username: "account@debuggeanoideas.com", │
+│    authorities: [VIEW_ACCOUNT]              │
+│  }                                          │
+└─────────────────────────────────────────────┘
+                    ↓
+┌─────────────────────────────────────────────┐
+│  ⑦  VALIDAR TOKEN                           │
+│                                             │
+│  if (jwtService.validateToken(jwt, userDetails))│
+│                                             │
+│  Valida:                                    │
+│  - ✅ Username coincide                     │
+│  - ✅ Token no expirado                     │
+│  - ✅ Firma válida                          │
+└─────────────────────────────────────────────┘
+                    ↓
+┌─────────────────────────────────────────────┐
+│  ⑧  CREAR AUTENTICACIÓN DE SPRING SECURITY  │
+│                                             │
+│  var authToken =                            │
+│      new UsernamePasswordAuthenticationToken(│
+│          userDetails,                       │
+│          null,                              │
+│          userDetails.getAuthorities()       │
+│      );                                     │
+│                                             │
+│  authToken.setDetails(                      │
+│      new WebAuthenticationDetailsSource()   │
+│          .buildDetails(request)             │
+│  );                                         │
+└─────────────────────────────────────────────┘
+                    ↓
+┌─────────────────────────────────────────────┐
+│  ⑨  GUARDAR AUTENTICACIÓN EN EL CONTEXTO    │
+│                                             │
+│  SecurityContextHolder.getContext()         │
+│      .setAuthentication(authToken);         │
+│                                             │
+│  ✅ Usuario autenticado en Spring Security  │
+└─────────────────────────────────────────────┘
+                    ↓
+┌─────────────────────────────────────────────┐
+│  ⑩  CONTINUAR CON LA PETICIÓN               │
+│                                             │
+│  filterChain.doFilter(request, response);   │
+│                                             │
+│  → El request llega al Controller           │
+└─────────────────────────────────────────────┘
+                    ↓
+┌─────────────────────────────────────────────┐
+│  ✅  CONTROLLER RECIBE PETICIÓN AUTENTICADA │
+│                                             │
+│  @GetMapping("/accounts")                   │
+│  public String getAccounts() {              │
+│      // Usuario ya autenticado ✅           │
+│      return "Account data";                 │
+│  }                                          │
+└─────────────────────────────────────────────┘
+```
+
+---
+
+## 🔐 Flujo Visual: Request → Response
+
+```
+┌──────────────────────┐
+│   👤 CLIENTE         │
+│   (Postman/Frontend) │
+└──────────────────────┘
+          │
+          │ GET /api/accounts
+          │ Authorization: Bearer eyJhbGci...
+          ↓
+┌──────────────────────────────────────────┐
+│   🔐 JWTValidationFilter                 │
+│                                          │
+│   1️⃣ Extrae token                        │
+│   2️⃣ Extrae username                     │
+│   3️⃣ Carga UserDetails                   │
+│   4️⃣ Valida token                        │
+│   5️⃣ Autentica en SecurityContext        │
+└──────────────────────────────────────────┘
+          │
+          │ Token válido ✅
+          ↓
+┌──────────────────────────────────────────┐
+│   🎯 @PreAuthorize("hasAuthority(...)")  │
+│      Spring Security verifica permisos   │
+└──────────────────────────────────────────┘
+          │
+          │ Usuario tiene permiso ✅
+          ↓
+┌──────────────────────────────────────────┐
+│   🎮 AccountController                   │
+│                                          │
+│   @GetMapping("/accounts")               │
+│   public String getAccounts() {          │
+│       return "Account data";             │
+│   }                                      │
+└──────────────────────────────────────────┘
+          │
+          │ Response: 200 OK
+          ↓
+┌──────────────────────┐
+│   👤 CLIENTE         │
+│   Recibe datos ✅    │
+└──────────────────────┘
+```
+
+---
+
+## 🚨 Casos de Error
+
+### ❌ **1. Token No Enviado**
+
+```
+GET /api/accounts
+(Sin header Authorization)
+        ↓
+JWTValidationFilter → requestTokenHeader = null
+        ↓
+filterChain.doFilter() → Sin autenticación
+        ↓
+403 Forbidden (Spring Security rechaza)
+```
+
+---
+
+### ❌ **2. Token Expirado**
+
+```
+Authorization: Bearer eyJhbGci... (expirado)
+        ↓
+JWTValidationFilter → getUsernameFromToken()
+        ↓
+❌ ExpiredJwtException
+        ↓
+log.warn("Token expired")
+        ↓
+filterChain.doFilter() → Sin autenticación
+        ↓
+403 Forbidden
+```
+
+---
+
+### ❌ **3. Token Inválido (Firma Incorrecta)**
+
+```
+Authorization: Bearer eyJhbGci... (firma alterada)
+        ↓
+JWTValidationFilter → validateToken()
+        ↓
+❌ SignatureException
+        ↓
+filterChain.doFilter() → Sin autenticación
+        ↓
+403 Forbidden
+```
+
+---
+
+## 🔗 Integración con Spring Security
+
+### 📋 **`SecurityFilterChain`**
+
+```java
+@Bean
+public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    http
+        .csrf(csrf -> csrf.disable())
+        .authorizeHttpRequests(auth -> auth
+            .requestMatchers("/authenticate").permitAll()  // Sin filtro
+            .anyRequest().authenticated()                  // Con filtro
+        )
+        .addFilterBefore(
+            jwtValidationFilter,                           // ← Tu filtro
+            UsernamePasswordAuthenticationFilter.class
+        );
+    return http.build();
+}
+```
+
+---
+
+## 📊 Tabla: Filtro vs Controller
+
+| Elemento | `JWTValidationFilter` | `Controller` |
+|----------|----------------------|--------------|
+| **Se ejecuta** | ✅ Antes del Controller | ⏱️ Después del filtro |
+| **Función** | Validar JWT + autenticar | Procesar lógica de negocio |
+| **Accede a** | `HttpServletRequest`, `HttpServletResponse` | `Authentication` (ya autenticado) |
+| **Si JWT inválido** | ❌ No autentica → 403 | ❌ No llega al Controller |
+
+---
+
+## 💡 Resumen
+
+```
+┌─────────────────────────────────────────────┐
+│  ¿POR QUÉ IMPLEMENTAR JWTValidationFilter?  │
+│                                             │
+│  ✅ Intercepta TODAS las peticiones         │
+│  ✅ Valida el JWT antes de llegar al Controller│
+│  ✅ Autentica al usuario en Spring Security │
+│  ✅ Permite que @PreAuthorize funcione      │
+│  ✅ Protege endpoints sin sesiones (stateless)│
+└─────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────┐
+│  FLUJO RESUMIDO:                            │
+│                                             │
+│  Request → JWTValidationFilter →            │
+│  → Valida Token →                           │
+│  → Autentica en SecurityContext →           │
+│  → Controller (usuario autenticado) →       │
+│  → Response                                 │
+└─────────────────────────────────────────────┘
+```

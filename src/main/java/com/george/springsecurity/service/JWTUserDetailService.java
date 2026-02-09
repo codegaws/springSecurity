@@ -11,7 +11,7 @@ import org.springframework.stereotype.Service;
 
 @Service
 @AllArgsConstructor
-public class JwtUserDetailService implements UserDetailsService {
+public class JWTUserDetailService implements UserDetailsService {
 
     private final CustomerRepository customerRepository;
 

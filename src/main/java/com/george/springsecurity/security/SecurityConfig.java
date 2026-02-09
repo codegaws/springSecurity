@@ -1,5 +1,6 @@
 package com.george.springsecurity.security;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -27,7 +28,7 @@ import java.util.List;
 public class SecurityConfig {
 
     @Bean
-    SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    SecurityFilterChain securityFilterChain(HttpSecurity http, JWTValidationfilter jwtValidationfilter) throws Exception {
         http.sessionManagement(sess -> sess.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
         var requestHandler = new CsrfTokenRequestAttributeHandler();
         requestHandler.setCsrfRequestAttributeName("_csrf");//-> Resumen: Es básicamente un "alias" o "nombre de variable" para que tanto backend como frontend sepan cómo referirse al token CSRF. con el que vamos a trabajar en el front end por convencion se usa _csrf
@@ -42,10 +43,11 @@ public class SecurityConfig {
                                 .permitAll())
                 .formLogin(Customizer.withDefaults())
                 .httpBasic(Customizer.withDefaults());
+        http.addFilterAfter(jwtValidationfilter, BasicAuthenticationFilter.class);
         http.cors(cors -> corsConfigurationSource());
         http.csrf(csrf -> csrf
                         .csrfTokenRequestHandler(requestHandler)
-                        .ignoringRequestMatchers("/welcome", "/about_us","/authenticate")
+                        .ignoringRequestMatchers("/welcome", "/about_us", "/authenticate")
                         .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse()))
                 .addFilterAfter(new CsrfCookieFilter(), BasicAuthenticationFilter.class);
         return http.build();

@@ -3,7 +3,7 @@ package com.george.springsecurity.controllers;
 import com.george.springsecurity.entities.JWTRequest;
 import com.george.springsecurity.entities.JWTResponse;
 import com.george.springsecurity.service.JWTService;
-import com.george.springsecurity.service.JwtUserDetailService;
+import com.george.springsecurity.service.JWTUserDetailService;
 import lombok.AllArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -19,7 +19,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class AuthController {
 
     private final AuthenticationManager authenticationManager;
-    private final JwtUserDetailService jwtUserDetailService;
+    private final JWTUserDetailService jwtUserDetailService;
     private final JWTService jwtService;
 
     @PostMapping("/authenticate")
