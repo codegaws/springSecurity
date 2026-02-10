@@ -3733,6 +3733,50 @@ public Boolean validateTokenWithoutDB(String token) {
    - Parsear los claims del token
 ```
 
+# Resumen 
+```md
+🛡️ Flujo de generación y validación de JWT en JWTService
+
+1️⃣ Método generateToken(UserDetails userDetails)  
+Recibe el usuario autenticado.  
+Extrae los roles y los coloca en un claim.  
+Llama a getToken para crear el JWT.  
+
+2️⃣ Método getToken(Map<String, Object> claims, String subject)  
+Recibe los claims y el usuario.  
+Genera la clave secreta (key) usando el string JWT_SECRET.  
+Construye el JWT:  
+- Añade claims, subject, fechas y firma.  
+Devuelve el JWT como string.  
+
+3️⃣ ¿Por qué se llama el key dos veces?  
+
+| Método                  | Uso del key | Propósito                  |
+|-------------------------|-------------|----------------------------|
+| getAllClaimsFromToken   | Verifica    | Leer y validar el token    |
+| getToken                | Firma       | Crear y firmar el token    |
+
+En ambos casos, necesitas la misma clave secreta para que el token sea válido y pueda ser verificado.  
+Al crear el token, la clave se usa para firmarlo.  
+Al leer el token, la clave se usa para verificar que la firma es válida y extraer los datos.  
+
+🧩 Resumen visual del flujo  
+El usuario solicita autenticación.  
+JWTService genera el token usando generateToken y getToken.  
+El sistema devuelve el JWT.  
+El cliente envía el JWT en requests.  
+El sistema verifica el JWT usando getAllClaimsFromToken.  
+
+📝 Conclusión  
+generateToken crea el JWT usando los datos del usuario.  
+getToken construye y firma el JWT.  
+getAllClaimsFromToken verifica y lee el JWT usando la misma clave.  
+La clave se usa dos veces: para firmar y para verificar, garantizando la seguridad y validez del token.  
+
+🗝️ La clave es el "pegamento" que asegura que el token es auténtico y no ha sido modificado.
+```
+
+
 ---
 ## 📝 Clase 60 - Configurando el Entry Point de JWT 👤👤🕵️‍♂🕵️‍♂🔑 🔑 
 
