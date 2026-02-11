@@ -24,6 +24,6 @@ public class SecurityConfig {
                 .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
                 .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
                 .build();
-        return new InMemoryRegisteredClientRepository(client);// muy porecido a UserDetails
+        return new InMemoryRegisteredClientRepository(client);// muy porecido a InMemoryUserDetails- problema seria un cliente estatico no se puede mover en runtime
     }
 }

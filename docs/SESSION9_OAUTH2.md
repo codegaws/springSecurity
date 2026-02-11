@@ -409,4 +409,33 @@ values ('debuggeandoideas',
  - se desarrollo PartnerEntity
  - se desarrollo PartnerRepository
 
+## Detalle del CAMELCASE y COINCIDENCIA de NOMBRE EN EL METODO FINDBYCLIENTID
+
+### 📝 ¿Importa el nombre del campo en la entidad para los métodos de Spring Data?
+
+#### 🟢 **No importa que esté escrito como `private String clientId;`**
+
+Spring Data JPA sigue la convención de **camelCase** para los nombres de los atributos en Java. El método `findByClientId` funciona correctamente porque:
+
+- El nombre del campo en la entidad es `clientId` (camelCase, como es estándar en Java).
+- El método en el repositorio es `findByClientId`, respetando el mismo nombre y formato.
+
+#### ⚠️ **No uses mayúscula inicial en atributos**
+- En Java, los atributos de clase deben empezar en minúscula (camelCase): `clientId` ✅
+- `ClientId` ❌ sería incorrecto para un atributo.
+
+#### 📦 **Resumen**
+| Correcto en entidad      | Correcto en repositorio         |
+|-------------------------|---------------------------------|
+| `private String clientId;` | `Optional<PartnerEntity> findByClientId(String clientId);` |
+
+- **Spring Data mapea automáticamente** el nombre del método al campo de la entidad, siempre que coincidan en camelCase.
+- No importa que el campo sea `clientId` y no `ClientId`.
+
+> 🧩 **Conclusión:**
+> ¡Tu código está correcto! Sigue usando camelCase para los atributos y los métodos de consulta funcionarán perfectamente.
+
+---
+
+
 ## 📝 Clase 72  - CREANDO REGISTEREDCLIENTREPOSITORY DINAMICO👤👤🕵️‍♂🕵️‍♂🔑 🔑
