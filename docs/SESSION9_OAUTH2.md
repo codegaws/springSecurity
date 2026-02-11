@@ -402,3 +402,11 @@ values ('debuggeandoideas',
             'https://oauthdebugger.com/debug',
             'https://springone.io/authorized')
 ```
+---
+
+## 📝 Clase 71  - MAPEANDO ENTIDADES PARTNER👤👤🕵️‍♂🕵️‍♂🔑 🔑
+
+ - se desarrollo PartnerEntity
+ - se desarrollo PartnerRepository
+
+## 📝 Clase 72  - CREANDO REGISTEREDCLIENTREPOSITORY DINAMICO👤👤🕵️‍♂🕵️‍♂🔑 🔑
