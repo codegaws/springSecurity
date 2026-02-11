@@ -13,19 +13,18 @@ import java.util.UUID;
 @Configuration
 public class SecurityConfig {
 
-    @Bean--
+    @Bean
     RegisteredClientRepository clientRepository() {
         var client = RegisteredClient
                 .withId(UUID.randomUUID().toString())
                 .clientId("debugueandoIdeas")
                 .clientSecret("secret")
                 .scope("read")
-                .redirectUri("hhtp://localhost:8080")
+                .redirectUri("http://localhost:8080")
                 .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
                 .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
                 .build();
-        return new InMemoryRegisteredClientRepository(client);
+        return new InMemoryRegisteredClientRepository(client);// muy porecido a UserDetails
+
     }
-
-
 }
