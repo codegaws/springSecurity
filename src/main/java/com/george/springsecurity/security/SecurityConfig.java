@@ -25,6 +25,5 @@ public class SecurityConfig {
                 .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
                 .build();
         return new InMemoryRegisteredClientRepository(client);// muy porecido a UserDetails
-
     }
 }

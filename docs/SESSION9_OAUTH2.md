@@ -1,5 +1,5 @@
 🛡️ 🌐🔒 Spring Security — OAUTH2 🔐🔐🔑🔑
-📝 Clase 67 - INTRODUCCION A LOS OAUTH2 👤👤🕵️‍♂🕵️‍♂🔑 🔑
+## 📝 Clase 67 - INTRODUCCION A LOS OAUTH2 👤👤🕵️‍♂🕵️‍♂🔑 🔑
 - Borramos JwtAuthenticationEntryPoint - JWTRequest -JWTResponse-AuthenticationController{
 - borramos todo de carpeta security - services de JWT tambien
 - borramos la libreria de pomxml de JWT
@@ -366,4 +366,39 @@ var client = RegisteredClient
 
 ---
 
-¿Necesitas que profundice en algún concepto específico? 🤓
+## 📝 Clase 70  - MODIFICANDO BASES DE DATOS👤👤🕵️‍♂🕵️‍♂🔑 🔑
+
+```SQL
+----------------Schema--------------
+create table partners (
+                          id bigserial primary key,
+                          client_id varchar(256),
+                          client_name varchar(256),
+                          client_secret varchar(256),
+                          scopes varchar(256),
+                          grant_types varchar(256),
+                          authentication_methods varchar(256),
+                          redirect_uri varchar(256),
+                          redirect_uri_logout varchar(256)
+);
+
+--------------Data-------------
+insert into partners(
+    client_id,
+    client_name,
+    client_secret,
+    scopes,
+    grant_types,
+    authentication_methods,
+    redirect_uri,
+    redirect_uri_logout
+)
+values ('debuggeandoideas',
+            'debuggeando ideas',
+            'secret',
+            'read,write',
+            'authorization_code,refresh_token',
+            'client_secret_basic,client_secret_jwt',
+            'https://oauthdebugger.com/debug',
+            'https://springone.io/authorized')
+```
