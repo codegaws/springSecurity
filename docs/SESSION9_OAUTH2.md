@@ -437,5 +437,94 @@ Spring Data JPA sigue la convención de **camelCase** para los nombres de los at
 
 ---
 
-
 ## 📝 Clase 72  - CREANDO REGISTEREDCLIENTREPOSITORY DINAMICO👤👤🕵️‍♂🕵️‍♂🔑 🔑
+
+---
+## 📝 Clase 73  - 👤🕵️‍♂🕵️‍♂🔑 🔑
+
+---
+
+## 📝 Clase 74  - 👤🕵️‍♂🕵️‍♂🔑 🔑
+
+---
+
+## 📝 Clase 75  - 👤🕵️‍♂🕵️‍♂🔑 🔑
+
+---
+
+## 📝 Clase 76  - 👤🕵️‍♂🕵️‍♂🔑 🔑
+
+---
+
+## 📝 Clase 77  - 👤🕵️‍♂🕵️‍♂🔑 🔑
+
+---
+
+## 📝 Clase 78  - 👤🕵️‍♂🕵️‍♂🔑 🔑
+
+---
+
+## 📝 Clase 79  - 👤🕵️‍♂🕵️‍♂🔑 🔑
+
+---
+
+## 📝 Clase 80  - 👤🕵️‍♂🕵️‍♂🔑 🔑
+
+---
+
+## 📝 Clase 81  - 👤🕵️‍♂🕵️‍♂🔑 🔑
+
+---
+
+## 📝 Clase 82  - 👤🕵️‍♂🕵️‍♂🔑 🔑
+
+---
+
+## 📝 Clase 83  - 👤🕵️‍♂🕵️‍♂🔑 🔑
+
+---
+
+## 📝 Clase 84  - 👤🕵️‍♂🕵️‍♂🔑 🔑
+
+---
+
+## 📝 Clase 85  - 👤🕵️‍♂🕵️‍♂🔑 🔑
+
+---
+
+## 📝 Clase 86  - 👤🕵️‍♂🕵️‍♂🔑 🔑
+
+---
+
+## 📝 Clase 87  - 👤🕵️‍♂🕵️‍♂🔑 🔑
+
+---
+
+## 📝 Clase 88  - 👤🕵️‍♂🕵️‍♂🔑 🔑
+
+---
+
+## 📝 Clase 89  - 👤🕵️‍♂🕵️‍♂🔑 🔑
+
+---
+
+## 📝 Clase 90  - 👤🕵️‍♂🕵️‍♂🔑 🔑
+
+---
+
+## 📝 Clase 91 - ¿Se puede tener roles y authorities? 👤🕵️‍♂🕵️‍♂🔑 🔑
+
+---
+
+## 📝 Clase 92 limpianzo codigo  - 👤🕵️‍♂🕵️‍♂🔑 🔑
+
+---
+
+
+
+
+
+
+
+
+
