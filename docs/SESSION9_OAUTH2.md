@@ -888,9 +888,1142 @@ var clientAuthorizationMethods = Arrays.stream(partner.getAuthenticationMethods(
 - El flujo permite que Spring Security gestione clientes OAuth2 de forma dinámica desde la base de datos.
 
 ---
-## 📝 Clase 73  - 👤🕵️‍♂🕵️‍♂🔑 🔑
+## 📝 Clase 73  - CustomerUserDetails 👤🕵️‍♂🕵️‍♂🔑 🔑
+# 🔐 Análisis completo de CustomerUserDetails
+
+## 🔄 Consulta 1: ¿Por qué usar `@Transactional` y cuándo es necesario?
+
+### 🎯 ¿Qué hace `@Transactional`?
+
+`@Transactional` **gestiona transacciones de base de datos** automáticamente. Spring se encarga de:
+
+- ✅ Abrir una transacción al inicio del método
+- ✅ Hacer commit si todo sale bien
+- ✅ Hacer rollback si hay una excepción
+- ✅ Cerrar la conexión a la BD
+
+### 📊 Comparación: `CustomerUserDetails` vs `PartnerRegisteredClientService`
+
+| Aspecto | CustomerUserDetails | PartnerRegisteredClientService |
+|---------|-------------------|-------------------------------|
+| **@Transactional** | ✅ SÍ necesario | ❌ NO necesario |
+| **Relaciones** | `@OneToMany` con EAGER | Sin relaciones |
+| **Operación** | Lectura + carga de relaciones | Solo lectura simple |
+| **Lazy Loading** | Posible problema sin transacción | No aplica |
 
 ---
+
+### 🔍 ¿Por qué `CustomerUserDetails` SÍ necesita `@Transactional`?
+
+#### 📦 Tu entidad tiene una relación `@OneToMany`:
+
+```java
+@Entity
+@Table(name = "customers")
+public class CustomerEntity {
+    
+    @OneToMany(fetch = FetchType.EAGER)  // ⚠️ Relación con otra tabla
+    @JoinColumn(name = "id_customer")
+    private List<RoleEntity> roles;  // ← Esto requiere otra consulta SQL
+}
+```
+
+#### 🔄 Flujo sin `@Transactional` (PROBLEMA ❌):
+
+```
+1. customerRepository.findByEmail(username)
+   ↓ Ejecuta: SELECT * FROM customers WHERE email = ?
+   ↓ Obtiene: CustomerEntity
+   ↓ Cierra la conexión a la BD ⚠️
+   
+2. customer.getRoles()
+   ↓ Intenta cargar roles desde BD
+   ❌ ERROR: LazyInitializationException
+   ❌ La sesión/conexión ya está cerrada
+```
+
+#### 🔄 Flujo con `@Transactional` (CORRECTO ✅):
+
+```
+1. @Transactional abre transacción
+   ↓
+2. customerRepository.findByEmail(username)
+   ↓ Ejecuta: SELECT * FROM customers WHERE email = ?
+   ↓ Obtiene: CustomerEntity
+   ↓ Conexión sigue ABIERTA ✅
+   
+3. customer.getRoles()
+   ↓ Ejecuta: SELECT * FROM roles WHERE id_customer = ?
+   ↓ Obtiene: List<RoleEntity>
+   ↓ Todo funciona ✅
+   
+4. @Transactional cierra transacción
+```
+
+---
+
+### 🔍 ¿Por qué `PartnerRegisteredClientService` NO necesita `@Transactional`?
+
+#### 📦 La entidad Partner NO tiene relaciones complejas:
+
+```java
+@Entity
+public class Partner {
+    private Long id;
+    private String clientId;
+    private String clientSecret;
+    private String scopes;  // String simple, NO relación
+    private String grantTypes;  // String simple, NO relación
+    private String authenticationMethods;  // String simple, NO relación
+    // Sin @OneToMany, @ManyToOne, etc.
+}
+```
+
+#### 🔄 Flujo simple (sin relaciones):
+
+```
+1. partnerRepository.findByClientId(clientId)
+   ↓ Ejecuta: SELECT * FROM partners WHERE client_id = ?
+   ↓ Obtiene: Partner (con todos los campos)
+   ↓ Cierra conexión
+   ✅ No hay problema porque NO hay otras tablas que cargar
+```
+
+---
+
+### 📋 Reglas para decidir cuándo usar `@Transactional`
+
+| Situación | ¿Necesita @Transactional? | Razón |
+|-----------|---------------------------|-------|
+| Entidad con `@OneToMany`, `@ManyToOne`, `@ManyToMany` | ✅ SÍ | Puede necesitar múltiples consultas |
+| Fetch `LAZY` | ✅ SÍ | Lazy loading requiere sesión abierta |
+| Solo lectura simple sin relaciones | ❌ NO | Una sola consulta, no hay problema |
+| Operaciones de escritura (INSERT, UPDATE, DELETE) | ✅ SÍ | Necesita commit/rollback |
+| Múltiples operaciones que deben ser atómicas | ✅ SÍ | Todo o nada |
+
+---
+
+### 💡 Ejemplo visual de la diferencia
+
+#### Con relaciones (CustomerUserDetails):
+```
+CustomerEntity
+├── id
+├── email
+├── password
+└── roles  ─────────┐
+                    ├──> RoleEntity 1
+                    ├──> RoleEntity 2
+                    └──> RoleEntity 3
+                    
+⚠️ Necesita @Transactional para cargar roles
+```
+
+#### Sin relaciones (PartnerRegisteredClientService):
+```
+Partner
+├── id
+├── clientId
+├── clientSecret
+├── scopes (String)
+├── grantTypes (String)
+└── authenticationMethods (String)
+
+✅ NO necesita @Transactional, todo en una tabla
+```
+
+---
+
+### 🎯 Conclusión de Consulta 1
+
+- **CustomerUserDetails necesita `@Transactional`** porque carga relaciones (`@OneToMany` con roles)
+- **PartnerRegisteredClientService NO necesita `@Transactional`** porque solo hace una lectura simple sin relaciones
+- La transacción mantiene la **sesión abierta** mientras se cargan las relaciones
+
+---
+
+## 🔍 Consulta 2: Explicación del primer `map` y Optional
+
+### 🎯 Código analizado:
+
+```java
+return this.customerRepository.findByEmail(username)
+    .map(customer -> {
+        // Transformación aquí
+    })
+```
+
+### ✅ Tu entendimiento es CORRECTO
+
+**SÍ**, el `map` transforma un `Optional<CustomerEntity>` en un `Optional<UserDetails>`.
+
+---
+
+### 📊 Flujo completo paso a paso
+
+#### 📥 Entrada:
+```java
+String username = "juan@gmail.com"  // Lo que el usuario ingresó en el login
+```
+
+#### 🔄 Paso 1: Buscar en BD
+
+```java
+this.customerRepository.findByEmail(username)
+```
+
+**Consulta SQL ejecutada:**
+```sql
+SELECT c.id, c.email, c.pwd 
+FROM customers c 
+WHERE c.email = 'juan@gmail.com'
+```
+
+**Resultado posible 1 (existe ✅):**
+```java
+Optional[CustomerEntity{
+  id: 1,
+  email: "juan@gmail.com",
+  password: "$2a$10$encrypted...",
+  roles: [...]
+}]
+```
+
+**Resultado posible 2 (NO existe ❌):**
+```java
+Optional.empty()
+```
+
+---
+
+#### 🔄 Paso 2: Transformar con `.map()`
+
+```java
+.map(customer -> {
+    // Si Optional contiene CustomerEntity, ejecuta esto
+    // Si Optional está vacío, salta esto
+})
+```
+
+**Si existe el customer:**
+```
+Optional[CustomerEntity]
+        ↓ .map()
+Ejecuta la lambda y transforma CustomerEntity → UserDetails
+        ↓
+Optional[UserDetails]
+```
+
+**Si NO existe:**
+```
+Optional.empty()
+        ↓ .map()
+NO ejecuta la lambda
+        ↓
+Optional.empty()
+```
+
+---
+
+### 🎨 Visualización del Optional
+
+```
+findByEmail("juan@gmail.com")
+        ↓
+    ¿Existe?
+    /      \
+  SÍ       NO
+   ↓        ↓
+Optional[  Optional.
+Customer]  empty()
+   ↓           ↓
+  map()      map()
+ejecuta    NO ejecuta
+   ↓           ↓
+Optional[  Optional.
+UserDetails] empty()
+   ↓           ↓
+orElseThrow() ←─┘
+   ↓
+Exception
+```
+
+---
+
+### 💻 Código equivalente sin Optional
+
+```java
+// Con Optional.map() (actual)
+return this.customerRepository.findByEmail(username)
+    .map(customer -> transformar(customer))
+    .orElseThrow(() -> new UsernameNotFoundException("User not found"));
+
+// Sin Optional (equivalente)
+CustomerEntity customer = this.customerRepository.findByEmailDirecto(username);
+if (customer != null) {
+    return transformar(customer);
+} else {
+    throw new UsernameNotFoundException("User not found");
+}
+```
+
+---
+
+### 📋 Resumen de Consulta 2
+
+| Concepto | Explicación |
+|----------|-------------|
+| **findByEmail(username)** | Busca en BD por email, retorna `Optional<CustomerEntity>` |
+| **Si existe** | `Optional[CustomerEntity{...}]` |
+| **Si NO existe** | `Optional.empty()` |
+| **.map()** | Transforma `CustomerEntity` → `UserDetails` |
+| **Resultado** | `Optional<UserDetails>` |
+
+---
+
+## 🎭 Consulta 3: Extracción y transformación de roles
+
+### 🎯 Código analizado:
+
+```java
+final var roles = customer.getRoles();
+final var authorities = roles
+```
+
+### ✅ Tu entendimiento es CORRECTO
+
+**SÍ**, obtienes la lista de roles del customer y luego la conviertes en Stream para transformarla.
+
+---
+
+### 📊 Flujo detallado
+
+#### 📥 Paso 1: Obtener roles del customer
+
+```java
+final var roles = customer.getRoles();
+```
+
+**SQL ejecutado (gracias a `@OneToMany`):**
+```sql
+SELECT r.id, r.name, r.id_customer 
+FROM roles r 
+WHERE r.id_customer = 1
+```
+
+**Resultado:**
+```java
+List<RoleEntity> roles = [
+  RoleEntity{id: 1, name: "ROLE_USER", idCustomer: 1},
+  RoleEntity{id: 2, name: "ROLE_ADMIN", idCustomer: 1}
+]
+```
+
+---
+
+#### 🔄 Paso 2: Convertir a Stream
+
+```java
+final var authorities = roles.stream()
+```
+
+**Transformación:**
+```
+List[RoleEntity, RoleEntity]
+        ↓ .stream()
+Stream[RoleEntity, RoleEntity]
+```
+
+**Visualización:**
+```
+roles (List)
+┌─────────────────────────┐
+│ RoleEntity("ROLE_USER") │
+│ RoleEntity("ROLE_ADMIN")│
+└─────────────────────────┘
+        ↓ .stream()
+Stream
+├─> RoleEntity("ROLE_USER")
+└─> RoleEntity("ROLE_ADMIN")
+```
+
+---
+
+### 🎯 ¿Por qué convertir a Stream?
+
+Para poder usar **operaciones funcionales** como `map()`, `filter()`, `collect()`:
+
+```java
+roles.stream()
+    .map(role -> transformar(role))      // Transformar cada elemento
+    .filter(role -> filtrar(role))        // Filtrar elementos
+    .collect(Collectors.toList())         // Convertir a lista
+```
+
+---
+
+### 📋 Resumen de Consulta 3
+
+| Paso | Código | Tipo | Contenido |
+|------|--------|------|-----------|
+| 1 | `customer.getRoles()` | `List<RoleEntity>` | `[RoleEntity, RoleEntity]` |
+| 2 | `.stream()` | `Stream<RoleEntity>` | `Stream[RoleEntity, RoleEntity]` |
+| 3 | Listo para transformar | - | Siguiente paso: `.map()` |
+
+---
+
+## 🔐 Consulta 4: Transformación de roles a authorities y creación de User
+
+### 🎯 Código completo analizado:
+
+```java
+final var authorities = roles
+    .stream()
+    .map(role -> new SimpleGrantedAuthority(role.getName()))
+    .collect(Collectors.toList());
+return new User(customer.getEmail(), customer.getPassword(), authorities);
+```
+
+---
+
+### 🔄 Paso a paso completo
+
+#### 📥 Estado inicial:
+
+```java
+List<RoleEntity> roles = [
+  RoleEntity{name: "ROLE_USER"},
+  RoleEntity{name: "ROLE_ADMIN"}
+]
+```
+
+---
+
+#### 🔄 Paso 1: Stream
+
+```java
+roles.stream()
+```
+
+```
+Stream[
+  RoleEntity{name: "ROLE_USER"},
+  RoleEntity{name: "ROLE_ADMIN"}
+]
+```
+
+---
+
+#### 🔄 Paso 2: Map (transformación)
+
+```java
+.map(role -> new SimpleGrantedAuthority(role.getName()))
+```
+
+**Proceso elemento por elemento:**
+
+```
+RoleEntity{name: "ROLE_USER"}
+        ↓ role.getName()
+"ROLE_USER"
+        ↓ new SimpleGrantedAuthority(...)
+SimpleGrantedAuthority("ROLE_USER")
+
+RoleEntity{name: "ROLE_ADMIN"}
+        ↓ role.getName()
+"ROLE_ADMIN"
+        ↓ new SimpleGrantedAuthority(...)
+SimpleGrantedAuthority("ROLE_ADMIN")
+```
+
+**Resultado del Stream:**
+```
+Stream[
+  SimpleGrantedAuthority("ROLE_USER"),
+  SimpleGrantedAuthority("ROLE_ADMIN")
+]
+```
+
+---
+
+#### 🔄 Paso 3: Collect (convertir a lista)
+
+```java
+.collect(Collectors.toList())
+```
+
+```
+Stream[SimpleGrantedAuthority, SimpleGrantedAuthority]
+        ↓ .collect(Collectors.toList())
+List[
+  SimpleGrantedAuthority("ROLE_USER"),
+  SimpleGrantedAuthority("ROLE_ADMIN")
+]
+```
+
+---
+
+#### 🔄 Paso 4: Crear User de Spring Security
+
+```java
+return new User(customer.getEmail(), customer.getPassword(), authorities);
+```
+
+**Parámetros:**
+- `username`: `customer.getEmail()` → `"juan@gmail.com"`
+- `password`: `customer.getPassword()` → `"$2a$10$encrypted..."`
+- `authorities`: `List<SimpleGrantedAuthority>` → `["ROLE_USER", "ROLE_ADMIN"]`
+
+**Resultado:**
+```java
+User{
+  username: "juan@gmail.com",
+  password: "$2a$10$encrypted...",
+  authorities: [
+    SimpleGrantedAuthority("ROLE_USER"),
+    SimpleGrantedAuthority("ROLE_ADMIN")
+  ],
+  enabled: true,
+  accountNonExpired: true,
+  credentialsNonExpired: true,
+  accountNonLocked: true
+}
+```
+
+---
+
+### 🔑 ¿Qué es `SimpleGrantedAuthority`?
+
+#### 📖 Definición:
+`SimpleGrantedAuthority` es una **implementación de la interfaz `GrantedAuthority`** de Spring Security que representa un **permiso o rol**.
+
+#### 🎯 ¿Para qué sirve?
+
+Spring Security usa `GrantedAuthority` para:
+
+- ✅ **Control de acceso**: Verificar si un usuario tiene permisos
+- ✅ **Autorización**: Decidir qué recursos puede acceder
+- ✅ **Roles**: Representar roles como ROLE_USER, ROLE_ADMIN
+
+---
+
+### 📊 Jerarquía de interfaces
+
+```
+GrantedAuthority (interfaz)
+        ↑
+        │ implementa
+        │
+SimpleGrantedAuthority (clase)
+```
+
+**Código de SimpleGrantedAuthority:**
+```java
+public class SimpleGrantedAuthority implements GrantedAuthority {
+    private final String role;
+    
+    public SimpleGrantedAuthority(String role) {
+        this.role = role;
+    }
+    
+    @Override
+    public String getAuthority() {
+        return this.role;
+    }
+}
+```
+
+---
+
+### 🔐 Uso en Spring Security
+
+#### Ejemplo de autorización en un controller:
+
+```java
+@GetMapping("/admin")
+@PreAuthorize("hasRole('ADMIN')")  // ← Busca SimpleGrantedAuthority("ROLE_ADMIN")
+public String adminPanel() {
+    return "admin";
+}
+
+@GetMapping("/user")
+@PreAuthorize("hasAnyRole('USER', 'ADMIN')")  // ← Busca cualquiera de estos roles
+public String userPanel() {
+    return "user";
+}
+```
+
+**Spring Security internamente:**
+```
+1. Usuario hace request a /admin
+2. Spring Security carga UserDetails
+3. Obtiene authorities: [SimpleGrantedAuthority("ROLE_ADMIN")]
+4. Verifica si contiene "ROLE_ADMIN"
+5. Si SÍ → permite acceso ✅
+6. Si NO → 403 Forbidden ❌
+```
+
+---
+
+### ❌ Manejo cuando NO se encuentra el usuario
+
+```java
+.orElseThrow(() -> new UsernameNotFoundException("User not found"));
+```
+
+#### 🔄 Flujo:
+
+```
+findByEmail("usuario-inexistente@gmail.com")
+        ↓
+Optional.empty()
+        ↓
+.map() NO se ejecuta (Optional vacío)
+        ↓
+.orElseThrow() se ejecuta
+        ↓
+throw new UsernameNotFoundException("User not found")
+```
+
+**Spring Security captura esta excepción y:**
+- ❌ Rechaza el login
+- 📝 Retorna error 401 Unauthorized
+- 🔒 NO revela si el email existe o no (seguridad)
+
+---
+
+### 📊 Tabla comparativa de transformaciones
+
+| Paso | Tipo | Contenido |
+|------|------|-----------|
+| 1. `customer.getRoles()` | `List<RoleEntity>` | `[RoleEntity{name:"ROLE_USER"}, ...]` |
+| 2. `.stream()` | `Stream<RoleEntity>` | `Stream[RoleEntity, ...]` |
+| 3. `.map(role -> new SimpleGrantedAuthority(role.getName()))` | `Stream<SimpleGrantedAuthority>` | `Stream[SimpleGrantedAuthority("ROLE_USER"), ...]` |
+| 4. `.collect(Collectors.toList())` | `List<SimpleGrantedAuthority>` | `[SimpleGrantedAuthority("ROLE_USER"), ...]` |
+| 5. `new User(email, password, authorities)` | `User` (UserDetails) | `User{username, password, authorities}` |
+
+---
+
+### 🎨 Visualización completa del flujo
+
+```
+CustomerEntity (BD)
+├── email: "juan@gmail.com"
+├── password: "$2a$10$..."
+└── roles: List[RoleEntity]
+           ├── RoleEntity{name: "ROLE_USER"}
+           └── RoleEntity{name: "ROLE_ADMIN"}
+                    ↓ .stream()
+           Stream[RoleEntity, RoleEntity]
+                    ↓ .map(role -> new SimpleGrantedAuthority(role.getName()))
+           Stream[SimpleGrantedAuthority, SimpleGrantedAuthority]
+                    ↓ .collect(Collectors.toList())
+           List[SimpleGrantedAuthority, SimpleGrantedAuthority]
+                    ↓ new User(email, password, authorities)
+User (Spring Security)
+├── username: "juan@gmail.com"
+├── password: "$2a$10$..."
+└── authorities: [
+    ├── SimpleGrantedAuthority("ROLE_USER")
+    └── SimpleGrantedAuthority("ROLE_ADMIN")
+]
+```
+
+---
+
+## 🎓 Resumen final del flujo completo
+
+```
+1. Usuario ingresa: email + password
+        ↓
+2. Spring Security llama: loadUserByUsername(email)
+        ↓
+3. Busca en BD: customerRepository.findByEmail(email)
+        ↓
+4. Si existe:
+   a. Obtiene CustomerEntity con roles
+   b. Transforma roles → authorities
+      - List<RoleEntity> → Stream
+      - Stream → map(new SimpleGrantedAuthority)
+      - Stream → collect(toList)
+   c. Crea User de Spring Security
+   d. Retorna UserDetails
+        ↓
+5. Spring Security valida password
+        ↓
+6. Si coincide: Autenticación exitosa ✅
+7. Si NO: Autenticación fallida ❌
+```
+
+---
+
+## 🏆 Conclusión general
+
+- ✅ **@Transactional** es necesario cuando hay relaciones (@OneToMany)
+- ✅ **Optional.map()** transforma CustomerEntity → UserDetails
+- ✅ **Stream** permite transformar List<RoleEntity> → List<SimpleGrantedAuthority>
+- ✅ **SimpleGrantedAuthority** representa roles para Spring Security
+- ✅ **User** es la implementación de UserDetails que Spring Security usa para autenticación
+---
+
+# 🔐 Diferencia entre RegisteredClientRepository y UserDetailsService en OAuth2
+
+## 🎯 Respuesta directa
+
+Son **dos cosas completamente diferentes** que cumplen roles distintos en OAuth2:
+
+| Aspecto | RegisteredClientRepository | UserDetailsService |
+|---------|---------------------------|-------------------|
+| **Representa** | 🖥️ Aplicaciones cliente | 👤 Usuarios finales |
+| **Busca** | clientId (app) | username (persona) |
+| **Retorna** | RegisteredClient | UserDetails |
+| **Valida** | Credenciales de la aplicación | Credenciales del usuario |
+| **Usado en** | Autenticación de cliente OAuth2 | Autenticación del usuario |
+
+---
+
+## 🏗️ Arquitectura OAuth2 - Los 3 actores principales
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    FLUJO OAUTH2 COMPLETO                     │
+└─────────────────────────────────────────────────────────────┘
+
+1️⃣ USUARIO (Resource Owner)
+   👤 Juan Pérez
+   📧 juan@gmail.com
+   🔑 password123
+   
+2️⃣ APLICACIÓN CLIENTE (Client)
+   🖥️ App "Debuggeando Ideas"
+   🆔 clientId: "debuggeandoideas"
+   🔐 clientSecret: "secret"
+   
+3️⃣ SERVIDOR DE AUTORIZACIÓN (Authorization Server)
+   🏢 Tu aplicación Spring Boot
+   ├─ RegisteredClientRepository ← Valida la APLICACIÓN
+   └─ UserDetailsService ← Valida al USUARIO
+```
+
+---
+
+## 🔄 Flujo completo OAuth2 - ¿Cuándo se usa cada uno?
+
+### 📱 Escenario real: Login con OAuth2
+
+```
+Usuario Juan quiere acceder a su cuenta en la app "Debuggeando Ideas"
+```
+
+---
+
+### 🎬 ACTO 1: La aplicación se presenta
+
+```
+┌────────────────────────────────────────────────────────────┐
+│ 1. App "Debuggeando Ideas" hace una petición:             │
+│                                                             │
+│    GET /oauth2/authorize?                                  │
+│        client_id=debuggeandoideas                          │
+│        &response_type=code                                 │
+│        &redirect_uri=https://oauthdebugger.com/debug       │
+│        &scope=read,write                                   │
+└────────────────────────────────────────────────────────────┘
+        ↓
+┌────────────────────────────────────────────────────────────┐
+│ 2. Spring Security llama a:                                │
+│    RegisteredClientRepository.findByClientId(              │
+│        "debuggeandoideas"                                  │
+│    )                                                       │
+└────────────────────────────────────────────────────────────┘
+        ↓
+┌────────────────────────────────────────────────────────────┐
+│ 3. ¿Esta aplicación está registrada?                       │
+│                                                             │
+│    ✅ SÍ existe: RegisteredClient{                         │
+│        clientId: "debuggeandoideas",                       │
+│        clientSecret: "secret",                             │
+│        redirectUri: "https://oauthdebugger.com/debug",     │
+│        scopes: ["read", "write"]                           │
+│    }                                                       │
+│                                                             │
+│    ✅ Aplicación VALIDADA                                  │
+└────────────────────────────────────────────────────────────┘
+```
+
+**🎯 RegisteredClientRepository valida que la APLICACIÓN esté autorizada**
+
+---
+
+### 🎬 ACTO 2: El usuario se autentica
+
+```
+┌────────────────────────────────────────────────────────────┐
+│ 4. Spring Security muestra pantalla de login:             │
+│                                                             │
+│    ┌─────────────────────────────┐                        │
+│    │   🔐 Login                  │                        │
+│    │                              │                        │
+│    │   Email: [juan@gmail.com  ] │                        │
+│    │   Password: [••••••••••••] │                        │
+│    │                              │                        │
+│    │   [  Iniciar Sesión  ]      │                        │
+│    └─────────────────────────────┘                        │
+└────────────────────────────────────────────────────────────┘
+        ↓
+┌────────────────────────────────────────────────────────────┐
+│ 5. Usuario ingresa sus credenciales y envía               │
+│                                                             │
+│    POST /login                                             │
+│    username=juan@gmail.com                                 │
+│    password=password123                                    │
+└────────────────────────────────────────────────────────────┘
+        ↓
+┌────────────────────────────────────────────────────────────┐
+│ 6. Spring Security llama a:                                │
+│    UserDetailsService.loadUserByUsername(                  │
+│        "juan@gmail.com"                                    │
+│    )                                                       │
+└────────────────────────────────────────────────────────────┘
+        ↓
+┌────────────────────────────────────────────────────────────┐
+│ 7. ¿Este usuario existe?                                   │
+│                                                             │
+│    ✅ SÍ existe: UserDetails{                              │
+│        username: "juan@gmail.com",                         │
+│        password: "$2a$10$encrypted...",                    │
+│        authorities: ["ROLE_USER", "ROLE_ADMIN"]            │
+│    }                                                       │
+│                                                             │
+│    ✅ Usuario VALIDADO                                     │
+└────────────────────────────────────────────────────────────┘
+```
+
+**🎯 UserDetailsService valida que el USUARIO sea legítimo**
+
+---
+
+### 🎬 ACTO 3: Generación del código de autorización
+
+```
+┌────────────────────────────────────────────────────────────┐
+│ 8. Spring Security genera código de autorización:         │
+│                                                             │
+│    Authorization Code: "abc123xyz789"                      │
+│                                                             │
+│    Este código está asociado a:                            │
+│    - Usuario: juan@gmail.com                               │
+│    - Cliente: debuggeandoideas                             │
+│    - Scopes: read, write                                   │
+└────────────────────────────────────────────────────────────┘
+        ↓
+┌────────────────────────────────────────────────────────────┐
+│ 9. Redirección a la aplicación:                            │
+│                                                             │
+│    HTTP/1.1 302 Found                                      │
+│    Location: https://oauthdebugger.com/debug?              │
+│              code=abc123xyz789                             │
+└────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### 🎬 ACTO 4: La aplicación intercambia el código por token
+
+```
+┌────────────────────────────────────────────────────────────┐
+│ 10. Aplicación hace petición:                              │
+│                                                             │
+│     POST /oauth2/token                                     │
+│     grant_type=authorization_code                          │
+│     code=abc123xyz789                                      │
+│     client_id=debuggeandoideas                             │
+│     client_secret=secret                                   │
+└────────────────────────────────────────────────────────────┘
+        ↓
+┌────────────────────────────────────────────────────────────┐
+│ 11. Spring Security vuelve a validar el cliente:           │
+│     RegisteredClientRepository.findByClientId(             │
+│         "debuggeandoideas"                                 │
+│     )                                                      │
+│                                                             │
+│     ✅ Cliente válido                                      │
+│     ✅ Client secret correcto                              │
+│     ✅ Código válido                                       │
+└────────────────────────────────────────────────────────────┘
+        ↓
+┌────────────────────────────────────────────────────────────┐
+│ 12. Spring Security genera tokens:                         │
+│                                                             │
+│     {                                                      │
+│       "access_token": "eyJhbGciOiJSUzI1NiIsInR5cCI6...",  │
+│       "token_type": "Bearer",                              │
+│       "expires_in": 28800,                                 │
+│       "refresh_token": "eyJhbGciOiJSUzI1NiIsInR5cC...",   │
+│       "scope": "read write"                                │
+│     }                                                      │
+└────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 📊 Comparación detallada
+
+### 🖥️ RegisteredClientRepository
+
+#### 🎯 Propósito:
+Gestionar **aplicaciones cliente** que quieren acceder a recursos protegidos.
+
+#### 📝 Datos que maneja:
+
+```java
+RegisteredClient {
+    id: "1",
+    clientId: "debuggeandoideas",           // ← Identificador de la APP
+    clientSecret: "secret",                  // ← Password de la APP
+    clientName: "Debuggeando Ideas",
+    authorizationGrantTypes: [               // ← Cómo puede obtener tokens
+        AUTHORIZATION_CODE,
+        REFRESH_TOKEN
+    ],
+    clientAuthenticationMethods: [           // ← Cómo se autentica la APP
+        CLIENT_SECRET_BASIC,
+        CLIENT_SECRET_JWT
+    ],
+    redirectUris: [                          // ← A dónde redirigir después
+        "https://oauthdebugger.com/debug"
+    ],
+    scopes: ["read", "write"]                // ← Qué permisos solicita
+}
+```
+
+#### 🔍 Búsqueda:
+```java
+RegisteredClient client = registeredClientRepository
+    .findByClientId("debuggeandoideas");
+```
+
+#### ✅ Valida:
+- ¿La aplicación está registrada?
+- ¿El client_secret es correcto?
+- ¿La redirect_uri es válida?
+- ¿Los scopes solicitados están permitidos?
+
+---
+
+### 👤 UserDetailsService
+
+#### 🎯 Propósito:
+Gestionar **usuarios** que son dueños de los recursos.
+
+#### 📝 Datos que maneja:
+
+```java
+UserDetails {
+    username: "juan@gmail.com",              // ← Email del USUARIO
+    password: "$2a$10$encrypted...",         // ← Password del USUARIO
+    authorities: [                            // ← Roles del USUARIO
+        SimpleGrantedAuthority("ROLE_USER"),
+        SimpleGrantedAuthority("ROLE_ADMIN")
+    ],
+    enabled: true,
+    accountNonExpired: true,
+    credentialsNonExpired: true,
+    accountNonLocked: true
+}
+```
+
+#### 🔍 Búsqueda:
+```java
+UserDetails user = userDetailsService
+    .loadUserByUsername("juan@gmail.com");
+```
+
+#### ✅ Valida:
+- ¿El usuario existe?
+- ¿La contraseña es correcta?
+- ¿La cuenta está activa?
+- ¿Qué roles/permisos tiene?
+
+---
+
+## 🤝 ¿Cómo interactúan en OAuth2?
+
+### 🔄 Secuencia de validaciones
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│              FLUJO COMPLETO DE VALIDACIONES                  │
+└─────────────────────────────────────────────────────────────┘
+
+1. Validación de la APLICACIÓN
+   ↓
+   RegisteredClientRepository
+   ├─ ¿clientId existe?
+   ├─ ¿clientSecret correcto?
+   ├─ ¿redirect_uri válida?
+   └─ ¿scopes permitidos?
+   
+2. Validación del USUARIO
+   ↓
+   UserDetailsService
+   ├─ ¿username existe?
+   ├─ ¿password correcto?
+   ├─ ¿cuenta activa?
+   └─ ¿tiene permisos?
+
+3. Generación de tokens
+   ↓
+   Token contiene información de:
+   ├─ Usuario (juan@gmail.com)
+   ├─ Cliente (debuggeandoideas)
+   └─ Scopes (read, write)
+```
+
+---
+
+## 🎭 Analogía del mundo real
+
+### 🏦 Como un banco:
+
+```
+🏢 BANCO (Authorization Server)
+├─ 🏪 Ventanilla de empresas (RegisteredClientRepository)
+│   │
+│   └─ Valida que la EMPRESA esté registrada
+│      "¿Tienes RUC? ¿Estás autorizada para hacer retiros?"
+│
+└─ 👥 Ventanilla de personas (UserDetailsService)
+    │
+    └─ Valida que la PERSONA sea cliente del banco
+       "¿Tienes cuenta? ¿Tu DNI es correcto? ¿Tu PIN es válido?"
+```
+
+#### 📝 Escenario:
+
+```
+Una empresa de contabilidad (CLIENT) quiere acceder
+a la cuenta bancaria de Juan (USER)
+
+1. Banco verifica: ¿La empresa está registrada? ✅
+   (RegisteredClientRepository)
+
+2. Banco pregunta a Juan: ¿Autorizas a esta empresa? 
+   Juan ingresa su DNI y PIN ✅
+   (UserDetailsService)
+
+3. Banco genera un permiso temporal para que la empresa
+   acceda solo a lo autorizado ✅
+   (Access Token)
+```
+
+---
+
+## 📋 Tabla de diferencias clave
+
+| Característica | RegisteredClientRepository | UserDetailsService |
+|----------------|---------------------------|-------------------|
+| **Representa** | Aplicación/Cliente OAuth2 | Usuario final |
+| **Busca por** | clientId | username/email |
+| **Credencial** | clientSecret | password |
+| **Retorna** | RegisteredClient | UserDetails |
+| **Cuándo se usa** | Al autorizar cliente | Al autenticar usuario |
+| **Información** | Configuración OAuth2 de la app | Datos y roles del usuario |
+| **Tabla BD** | `partners` (en tu caso) | `customers` (en tu caso) |
+| **Se valida** | 2 veces (authorize + token) | 1 vez (login) |
+
+---
+
+## 🔐 ¿Por qué son AMBOS necesarios?
+
+### ❌ Sin RegisteredClientRepository:
+
+```
+Cualquier aplicación podría:
+├─ Solicitar tokens sin estar registrada
+├─ Usar redirect_uri maliciosas (phishing)
+├─ Solicitar scopes no autorizados
+└─ Robar tokens de otras aplicaciones
+
+🚨 PELIGRO: No sabrías qué aplicación está accediendo
+```
+
+### ❌ Sin UserDetailsService:
+
+```
+Cualquiera podría:
+├─ Generar tokens sin autenticar al usuario real
+├─ Acceder a recursos sin validar identidad
+├─ No habría control de roles/permisos
+└─ No sabrías a nombre de quién se accede
+
+🚨 PELIGRO: No sabrías QUÉ usuario está detrás
+```
+
+### ✅ Con AMBOS:
+
+```
+Seguridad completa:
+├─ ✅ Aplicación verificada (RegisteredClientRepository)
+├─ ✅ Usuario autenticado (UserDetailsService)
+├─ ✅ Permisos controlados (scopes + roles)
+└─ ✅ Trazabilidad completa
+
+🎯 Token contiene:
+   - Qué aplicación lo solicitó
+   - Para qué usuario
+   - Qué puede hacer
+```
+
+---
+
+## 🎯 Visualización del token resultante
+
+```json
+{
+  "sub": "juan@gmail.com",              ← UserDetailsService
+  "aud": "debuggeandoideas",            ← RegisteredClientRepository
+  "scope": ["read", "write"],           ← RegisteredClientRepository
+  "authorities": [                       ← UserDetailsService
+    "ROLE_USER",
+    "ROLE_ADMIN"
+  ],
+  "iss": "http://localhost:9000",
+  "exp": 1234567890,
+  "iat": 1234567890
+}
+```
+
+---
+
+## 🏁 Conclusión
+
+### 🎯 Respuestas directas:
+
+**¿Se parecen?**
+- Sí, en estructura (ambos buscan y validan)
+- No, en propósito (uno valida apps, otro usuarios)
+
+**¿Cómo interactúan?**
+- Trabajan en SECUENCIA:
+  1. Primero valida la aplicación
+  2. Luego valida al usuario
+  3. Juntos generan el token
+
+**¿Por qué son necesarios?**
+- **RegisteredClientRepository**: Controla QUÉ APLICACIONES acceden
+- **UserDetailsService**: Controla QUÉ USUARIOS permiten el acceso
+- **Juntos**: Proporcionan seguridad completa en OAuth2
+
+### 📊 Regla mnemotécnica:
+
+```
+RegisteredClientRepository = "¿QUIÉN pregunta?" (la app)
+UserDetailsService = "¿A NOMBRE DE QUIÉN?" (el usuario)
+```
+
+**Ambos son necesarios porque OAuth2 es un protocolo de DELEGACIÓN**:
+El usuario DELEGA a una aplicación el acceso a sus recursos.
 
 ## 📝 Clase 74  - 👤🕵️‍♂🕵️‍♂🔑 🔑
 
