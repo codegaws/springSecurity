@@ -439,6 +439,454 @@ Spring Data JPA sigue la convención de **camelCase** para los nombres de los at
 
 ## 📝 Clase 72  - CREANDO REGISTEREDCLIENTREPOSITORY DINAMICO👤👤🕵️‍♂🕵️‍♂🔑 🔑
 
+# 🔐 Análisis completo de PartnerRegisteredClientService
+
+## 📋 Consulta 1: ¿Qué es y para qué sirve `RegisteredClientRepository`?
+
+### 🎯 Definición
+`RegisteredClientRepository` es una **interfaz de Spring Authorization Server** que define el contrato para gestionar clientes OAuth2 registrados.
+
+### 🛠️ ¿Para qué sirve?
+Es el **repositorio de configuraciones de clientes OAuth2**. Permite a Spring Security:
+
+- ✅ **Buscar clientes** por su `clientId`
+- ✅ **Guardar nuevos clientes**
+- ✅ **Buscar clientes** por su `id` interno
+- ✅ **Validar credenciales** durante el flujo OAuth2
+
+### 🔄 Flujo de uso
+```
+Cliente hace petición OAuth2
+        ↓
+Spring Security llama a findByClientId("debuggeandoideas")
+        ↓
+Busca en la BD a través de PartnerRepository
+        ↓
+Construye un RegisteredClient con esos datos
+        ↓
+Valida credenciales y genera tokens
+```
+
+### 📝 Métodos obligatorios
+
+| Método | Parámetro | Retorna | Propósito |
+|--------|-----------|---------|-----------|
+| `findByClientId` | String clientId | RegisteredClient | Buscar cliente por clientId |
+| `save` | RegisteredClient | void | Guardar cliente nuevo |
+| `findById` | String id | RegisteredClient | Buscar por ID interno |
+
+### 💡 Analogía
+Es como un **catálogo de aplicaciones autorizadas**. Cada vez que una app intenta autenticarse, Spring busca en este catálogo si existe y qué permisos tiene.
+
+---
+
+## 📦 Consulta 2: ¿Qué guarda `partnerOpt`?
+
+### 🎯 Respuesta corta
+**SÍ**, `partnerOpt` es un `Optional<Partner>` que **puede o no contener** el registro de la base de datos que coincide con el `clientId` recibido.
+
+### 🔍 Desglose del flujo
+
+```java
+var partnerOpt = this.partnerRepository.findByClientId(clientId);
+```
+
+#### Escenario 1: Cliente existe ✅
+```
+Petición: findByClientId("debuggeandoideas")
+        ↓
+Busca en BD: SELECT * FROM partners WHERE client_id = 'debuggeandoideas'
+        ↓
+Encuentra el registro:
+{
+  id: 1,
+  client_id: "debuggeandoideas",
+  client_name: "debuggeando ideas",
+  client_secret: "secret",
+  scopes: "read,write",
+  grant_types: "authorization_code,refresh_token",
+  authentication_methods: "client_secret_basic,client_secret_jwt",
+  redirect_uri: "https://oauthdebugger.com/debug",
+  redirect_uri_logout: "https://springone.io/authorized"
+}
+        ↓
+partnerOpt = Optional[Partner{...}]  // Contiene el objeto
+```
+
+#### Escenario 2: Cliente NO existe ❌
+```
+Petición: findByClientId("cliente-inexistente")
+        ↓
+Busca en BD: SELECT * FROM partners WHERE client_id = 'cliente-inexistente'
+        ↓
+No encuentra nada
+        ↓
+partnerOpt = Optional.empty()  // Vacío
+```
+
+### 📊 Estructura del objeto Partner que se guarda
+
+Basándome en tus datos SQL:
+
+```java
+Partner {
+  id = 1,
+  clientId = "debuggeandoideas",
+  clientName = "debuggeando ideas",
+  clientSecret = "secret",
+  scopes = "read,write",  // ⚠️ String separado por comas
+  grantTypes = "authorization_code,refresh_token",  // ⚠️ String separado por comas
+  authenticationMethods = "client_secret_basic,client_secret_jwt",  // ⚠️ String separado por comas
+  redirectUri = "https://oauthdebugger.com/debug",
+  redirectUriLogout = "https://springone.io/authorized"
+}
+```
+
+### 🎨 Visualización del Optional
+
+```
+Optional<Partner>
+├── Si existe: Optional[Partner{clientId="debuggeandoideas", ...}]
+└── Si NO existe: Optional.empty()
+```
+
+---
+
+## 🔄 Consulta 3: ¿Este código transforma un objeto BD en RegisteredClient?
+
+```java
+return partnerOpt.map(partner -> 
+```
+
+### 🎯 Respuesta: **¡Exactamente! SÍ**
+
+### 📖 Explicación detallada
+
+#### ¿Qué hace `.map()`?
+
+```java
+partnerOpt.map(partner -> {
+    // Transformación aquí
+})
+```
+
+- 🔍 **Si `partnerOpt` contiene un valor** (`Optional[Partner]`):
+    - Ejecuta la lambda
+    - Transforma `Partner` → `RegisteredClient`
+    - Retorna `Optional[RegisteredClient]`
+
+- ❌ **Si `partnerOpt` está vacío** (`Optional.empty()`):
+    - NO ejecuta la lambda
+    - Retorna `Optional.empty()`
+
+### 🔄 Flujo de transformación
+
+```
+Partner (Base de datos)          →          RegisteredClient (Spring Security)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+id: 1                            →          id: "1"
+clientId: "debuggeandoideas"     →          clientId: "debuggeandoideas"
+clientName: "debuggeando ideas"  →          clientName: "debuggeando ideas"
+clientSecret: "secret"           →          clientSecret: "secret"
+scopes: "read,write"             →          scopes: ["read", "write"]
+grantTypes: "authorization_code,refresh_token"  →  grantTypes: [AUTHORIZATION_CODE, REFRESH_TOKEN]
+authenticationMethods: "client_secret_basic,client_secret_jwt"  →  [CLIENT_SECRET_BASIC, CLIENT_SECRET_JWT]
+redirectUri: "https://..."       →          redirectUri: "https://..."
+redirectUriLogout: "https://..." →          postLogoutRedirectUri: "https://..."
+```
+
+### 💻 Código equivalente sin Optional.map()
+
+```java
+// Con Optional.map (código actual)
+return partnerOpt.map(partner -> transformar(partner))
+                .orElseThrow(...);
+
+// Sin Optional.map (equivalente)
+if (partnerOpt.isPresent()) {
+    Partner partner = partnerOpt.get();
+    return transformar(partner);
+} else {
+    throw new BadCredentialsException("Client no exists");
+}
+```
+
+### 🎯 Ventaja de usar `.map()`
+- ✅ Código más limpio
+- ✅ Programación funcional
+- ✅ Evita if-else anidados
+- ✅ Manejo automático del Optional
+
+---
+
+## 🧩 Consulta 4: Explicación del proceso de transformación de Strings a objetos
+
+```java
+var authorizationGranTypes = Arrays.stream(partner.getGrandTypes().split(","))
+        .map(AuthorizationGrantType::new)
+        .toList();
+
+var clientAuthorizationMethods = Arrays.stream(partner.getAuthenticationMethods().split(","))
+        .map(ClientAuthenticationMethod::new)
+        .toList();
+
+var scopes = Arrays.stream(partner.getScopes().split(",")).toList();
+```
+
+### 🎯 Objetivo general
+Convertir **Strings separados por comas** de la BD en **Listas de objetos** que Spring Security entiende.
+
+---
+
+### 🔧 Parte 1: `authorizationGranTypes`
+
+#### 📥 Entrada (desde BD)
+```java
+partner.getGrandTypes() = "authorization_code,refresh_token"
+```
+
+#### 🔄 Proceso paso a paso
+
+```java
+// Paso 1: Split por comas
+partner.getGrandTypes().split(",")
+// Resultado: ["authorization_code", "refresh_token"]
+
+// Paso 2: Convertir array a Stream
+Arrays.stream(["authorization_code", "refresh_token"])
+
+// Paso 3: Transformar cada String en AuthorizationGrantType
+.map(AuthorizationGrantType::new)
+// Equivalente a: .map(str -> new AuthorizationGrantType(str))
+
+// Resultado intermedio:
+Stream[
+  AuthorizationGrantType("authorization_code"),
+  AuthorizationGrantType("refresh_token")
+]
+
+// Paso 4: Convertir Stream a List
+.toList()
+
+// Resultado final:
+List[
+  AuthorizationGrantType.AUTHORIZATION_CODE,
+  AuthorizationGrantType.REFRESH_TOKEN
+]
+```
+
+#### 📊 Visualización del flujo
+
+```
+"authorization_code,refresh_token"  (String en BD)
+        ↓ split(",")
+["authorization_code", "refresh_token"]  (Array)
+        ↓ Arrays.stream()
+Stream["authorization_code", "refresh_token"]  (Stream)
+        ↓ map(AuthorizationGrantType::new)
+Stream[AuthorizationGrantType, AuthorizationGrantType]  (Stream de objetos)
+        ↓ toList()
+List[AuthorizationGrantType, AuthorizationGrantType]  (Lista final)
+```
+
+---
+
+### 🔐 Parte 2: `clientAuthorizationMethods`
+
+#### 📥 Entrada (desde BD)
+```java
+partner.getAuthenticationMethods() = "client_secret_basic,client_secret_jwt"
+```
+
+#### 🔄 Proceso idéntico
+
+```java
+Arrays.stream(partner.getAuthenticationMethods().split(","))
+    .map(ClientAuthenticationMethod::new)
+    .toList();
+
+// Transformación:
+"client_secret_basic,client_secret_jwt"
+        ↓
+["client_secret_basic", "client_secret_jwt"]
+        ↓
+[ClientAuthenticationMethod.CLIENT_SECRET_BASIC, 
+ ClientAuthenticationMethod.CLIENT_SECRET_JWT]
+```
+
+---
+
+### 🏷️ Parte 3: `scopes`
+
+#### 📥 Entrada (desde BD)
+```java
+partner.getScopes() = "read,write"
+```
+
+#### 🔄 Proceso simplificado
+
+```java
+Arrays.stream(partner.getScopes().split(",")).toList();
+
+// Transformación:
+"read,write"
+        ↓
+["read", "write"]
+        ↓
+List["read", "write"]  // Se queda como Strings, no se convierte a objetos
+```
+
+#### ⚠️ Diferencia importante
+- Los **scopes** se quedan como `List<String>`
+- Los **grant types** y **auth methods** se convierten a objetos específicos
+
+---
+
+### 🧠 ¿Por qué usar Streams?
+
+#### ❌ Sin Streams (código imperativo)
+```java
+String[] grantTypesArray = partner.getGrandTypes().split(",");
+List<AuthorizationGrantType> authorizationGranTypes = new ArrayList<>();
+for (String gt : grantTypesArray) {
+    authorizationGranTypes.add(new AuthorizationGrantType(gt));
+}
+```
+
+#### ✅ Con Streams (código funcional)
+```java
+var authorizationGranTypes = Arrays.stream(partner.getGrandTypes().split(","))
+    .map(AuthorizationGrantType::new)
+    .toList();
+```
+
+### 📈 Ventajas de Streams
+- ✅ Menos código
+- ✅ Más legible
+- ✅ Inmutable (`.toList()` crea lista inmutable)
+- ✅ Funcional y declarativo
+
+---
+
+### 🎯 Uso posterior en el builder
+
+```java
+.authorizationGrantType(authorizationGranTypes.get(0))  // AUTHORIZATION_CODE
+.authorizationGrantType(authorizationGranTypes.get(1))  // REFRESH_TOKEN
+.clientAuthenticationMethod(clientAuthorizationMethods.get(0))  // CLIENT_SECRET_BASIC
+.clientAuthenticationMethod(clientAuthorizationMethods.get(1))  // CLIENT_SECRET_JWT
+.scope(scopes.get(0))  // "read"
+.scope(scopes.get(1))  // "write"
+```
+
+---
+
+### 📊 Tabla resumen de transformaciones
+
+| Variable | Tipo en BD | Valor BD | Proceso | Tipo final | Valor final |
+|----------|------------|----------|---------|------------|-------------|
+| `authorizationGranTypes` | String | `"authorization_code,refresh_token"` | split → stream → map → toList | `List<AuthorizationGrantType>` | `[AUTHORIZATION_CODE, REFRESH_TOKEN]` |
+| `clientAuthorizationMethods` | String | `"client_secret_basic,client_secret_jwt"` | split → stream → map → toList | `List<ClientAuthenticationMethod>` | `[CLIENT_SECRET_BASIC, CLIENT_SECRET_JWT]` |
+| `scopes` | String | `"read,write"` | split → stream → toList | `List<String>` | `["read", "write"]` |
+
+---
+
+## 🎓 Resumen general del algoritmo completo
+
+```
+1. Recibe clientId del endpoint
+        ↓
+2. Busca en BD: partnerOpt = partnerRepository.findByClientId(clientId)
+        ↓
+3. Si existe (Optional contiene Partner):
+   a. Extrae y transforma grant types (String → List<AuthorizationGrantType>)
+   b. Extrae y transforma auth methods (String → List<ClientAuthenticationMethod>)
+   c. Extrae scopes (String → List<String>)
+        ↓
+4. Construye RegisteredClient con builder pattern
+        ↓
+5. Retorna RegisteredClient
+        ↓
+6. Si NO existe: lanza BadCredentialsException
+```
+
+# 🛠️ Explicación del código PartnerRegisteredClientService
+
+## 📄 ¿Qué hace esta clase?
+
+`PartnerRegisteredClientService` implementa la interfaz `RegisteredClientRepository` de Spring Authorization Server. Su objetivo es buscar y construir un objeto `RegisteredClient` a partir de los datos almacenados en la base de datos (a través de `PartnerRepository`).
+
+## 🔍 Flujo del método `findByClientId`
+
+### Recibe un `clientId`:
+El método busca en la base de datos un partner (cliente OAuth2) con ese `clientId`.
+
+### Si existe el partner:
+- Extrae los tipos de grant (`grantTypes`), métodos de autenticación (`authenticationMethods`) y scopes, separando los valores por comas.
+- Crea listas de objetos a partir de esos valores.
+- Construye un objeto `RegisteredClient` usando los datos del partner.
+
+### Si no existe:
+Lanza una excepción `BadCredentialsException`.
+
+## ⚠️ ¿Por qué hay error en las líneas 44 y 45?
+
+```java
+.clientAuthenticationMethod(clientAuthorizationMethods.get(0))
+.clientAuthenticationMethod(clientAuthorizationMethods.get(1))
+```
+
+### Problema:
+El método `clientAuthenticationMethod` espera un objeto de tipo `ClientAuthenticationMethod`, pero tú le estás pasando un objeto de tipo `AuthorizationGrantType`.
+
+### Causa:
+En la línea:
+```java
+var clientAuthorizationMethods = Arrays.stream(partner.getAuthenticationMethods().split(","))
+    .map(AuthorizationGrantType::new)
+    .toList();
+```
+
+Estás usando `AuthorizationGrantType::new` en vez de `ClientAuthenticationMethod::new`.
+
+Por eso, la lista `clientAuthorizationMethods` contiene objetos del tipo incorrecto.
+
+### Solución:
+Debes cambiar esa línea por:
+```java
+var clientAuthorizationMethods = Arrays.stream(partner.getAuthenticationMethods().split(","))
+    .map(ClientAuthenticationMethod::new)
+    .toList();
+```
+
+## 📝 Resumen en tabla
+
+| Línea | Qué hace | Problema | Solución |
+|-------|----------|----------|----------|
+| 44-45 | Añade métodos de autenticación al builder | Usa tipo incorrecto (`AuthorizationGrantType`) | Usar `ClientAuthenticationMethod` |
+
+## 🧩 Ejemplo corregido
+
+```java
+var clientAuthorizationMethods = Arrays.stream(partner.getAuthenticationMethods().split(","))
+    .map(ClientAuthenticationMethod::new)
+    .toList();
+```
+
+## 🧠 ¿Cómo funciona el flujo completo?
+
+1. El cliente OAuth2 hace una petición.
+2. Spring Security llama a `findByClientId` para buscar la configuración del cliente.
+3. Si existe, se construye un `RegisteredClient` con los datos de la base.
+4. Si no, se lanza una excepción.
+
+## 🏁 Conclusión
+
+- El error es por usar el tipo incorrecto al mapear los métodos de autenticación.
+- Cambia a `ClientAuthenticationMethod::new` para solucionarlo.
+- El flujo permite que Spring Security gestione clientes OAuth2 de forma dinámica desde la base de datos.
+
 ---
 ## 📝 Clase 73  - 👤🕵️‍♂🕵️‍♂🔑 🔑
 

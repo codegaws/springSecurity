@@ -10,9 +10,9 @@ import org.springframework.security.oauth2.server.authorization.client.Registere
 
 import java.util.UUID;
 
-@Configuration
+//@Configuration
 public class SecurityConfig {
-
+/*
     @Bean
     RegisteredClientRepository clientRepository() {
         var client = RegisteredClient
@@ -26,4 +26,6 @@ public class SecurityConfig {
                 .build();
         return new InMemoryRegisteredClientRepository(client);// muy porecido a InMemoryUserDetails- problema seria un cliente estatico no se puede mover en runtime
     }
+    */
+
 }
