@@ -28,9 +28,7 @@
 ```
 ## 📝 Clase 69 - OAUTH2 CREANDO RegisteredClientRepository ESTATICO👤👤🕵️‍♂🕵️‍♂🔑 🔑
 
-# 🔐 Guía Visual: OAuth2 en Spring Security
-
-## 🎯 ¿Qué es OAuth2?
+### 🎯 ¿Qué es OAuth2?
 
 Antes de explicar el código, es importante entender que **OAuth2 es un protocolo de autorización** que permite a aplicaciones de terceros acceder a recursos de un usuario sin necesidad de conocer sus credenciales (usuario/contraseña).
 
@@ -38,20 +36,20 @@ Antes de explicar el código, es importante entender que **OAuth2 es un protocol
 
 ---
 
-## 📚 RegisteredClientRepository
+### 📚 RegisteredClientRepository
 
-### 🤔 ¿Qué es?
+#### 🤔 ¿Qué es?
 
 `RegisteredClientRepository` es una **interfaz** que define cómo se almacenan y recuperan los **clientes OAuth2 registrados** en tu servidor de autorización.
 
-### 👤 ¿Qué es un "cliente" en OAuth2?
+#### 👤 ¿Qué es un "cliente" en OAuth2?
 
 Un cliente es cualquier **aplicación** que quiere acceder a recursos protegidos en nombre de un usuario. Por ejemplo:
 - 📱 Una aplicación móvil
 - 🌐 Una aplicación web
 - 💻 Una aplicación de escritorio
 
-### 🛠️ Métodos principales
+#### 🛠️ Métodos principales
 
 ```java
 public interface RegisteredClientRepository {
@@ -70,13 +68,13 @@ public interface RegisteredClientRepository {
 
 ---
 
-## 🧠 InMemoryRegisteredClientRepository
+### 🧠 InMemoryRegisteredClientRepository
 
-### 💡 ¿Qué significa?
+#### 💡 ¿Qué significa?
 
 Es una implementación de `RegisteredClientRepository` que **almacena los clientes en memoria** (RAM).
 
-### ⚖️ Características
+#### ⚖️ Características
 
 ```markdown
 ✅ Ventajas:
@@ -90,7 +88,7 @@ Es una implementación de `RegisteredClientRepository` que **almacena los client
 - ⚠️ NO recomendado para producción
 ```
 
-### 🏭 Para producción deberías usar:
+#### 🏭 Para producción deberías usar:
 
 - 🗄️ `JdbcRegisteredClientRepository` (base de datos)
 - 🔴 Implementación personalizada con Redis
@@ -98,15 +96,15 @@ Es una implementación de `RegisteredClientRepository` que **almacena los client
 
 ---
 
-## 🔑 ClientAuthenticationMethod
+### 🔑 ClientAuthenticationMethod
 
-### 🎭 ¿Qué es?
+#### 🎭 ¿Qué es?
 
 Define **cómo el cliente se autentica** ante el servidor de autorización para demostrar su identidad.
 
-### 🔐 CLIENT_SECRET_BASIC
+#### 🔐 CLIENT_SECRET_BASIC
 
-Es el método de autenticación donde:
+#### Es el método de autenticación donde:
 
 1. 📤 El cliente envía sus credenciales (`clientId` + `clientSecret`)
 2. 🔄 Estas se codifican en **Base64**
@@ -140,13 +138,13 @@ ClientAuthenticationMethod.NONE
 
 ---
 
-## 🎟️ AuthorizationGrantType
+### 🎟️ AuthorizationGrantType
 
-### 🌊 ¿Qué es?
+#### 🌊 ¿Qué es?
 
 Define **el flujo OAuth2** que el cliente puede usar para obtener tokens de acceso.
 
-### 📋 AUTHORIZATION_CODE
+#### 📋 AUTHORIZATION_CODE
 
 Es el flujo más seguro y común. Se usa típicamente en aplicaciones web.
 
@@ -173,7 +171,7 @@ Es el flujo más seguro y común. Se usa típicamente en aplicaciones web.
 http://localhost:8080?code=ABC123XYZ
 ```
 
-### 🎪 Otros tipos de Grant
+#### 🎪 Otros tipos de Grant
 
 ```java
 // 🤖 Para aplicaciones sin backend (SPA, móviles)
@@ -191,7 +189,7 @@ AuthorizationGrantType.IMPLICIT
 
 ---
 
-## 🔍 Desglose de tu código
+### 🔍 Desglose de tu código
 
 ```java
 var client = RegisteredClient
@@ -222,7 +220,7 @@ var client = RegisteredClient
 
 ---
 
-## 🚀 Mejoras recomendadas para tu código
+### 🚀 Mejoras recomendadas para tu código
 
 ### 1. 🔒 Encriptar el client secret
 
@@ -287,7 +285,7 @@ var client = RegisteredClient
 
 ---
 
-## 🗺️ Resumen Visual
+### 🗺️ Resumen Visual
 
 ```
 ┌─────────────────────────────────────────────────────────┐
@@ -312,7 +310,7 @@ var client = RegisteredClient
 
 ---
 
-## 🆚 Diferencia entre JWT y OAuth2
+### 🆚 Diferencia entre JWT y OAuth2
 
 ```markdown
 🎫 JWT:
@@ -332,7 +330,7 @@ var client = RegisteredClient
 
 ---
 
-## 🎓 Diagrama de Flujo Completo
+### 🎓 Diagrama de Flujo Completo
 
 ```
 🧑 Usuario                 🌐 Cliente            🔐 Auth Server         💾 Resource Server
@@ -409,7 +407,7 @@ values ('debuggeandoideas',
  - se desarrollo PartnerEntity
  - se desarrollo PartnerRepository
 
-## Detalle del CAMELCASE y COINCIDENCIA de NOMBRE EN EL METODO FINDBYCLIENTID
+### Detalle del CAMELCASE y COINCIDENCIA de NOMBRE EN EL METODO FINDBYCLIENTID
 
 ### 📝 ¿Importa el nombre del campo en la entidad para los métodos de Spring Data?
 
@@ -439,14 +437,14 @@ Spring Data JPA sigue la convención de **camelCase** para los nombres de los at
 
 ## 📝 Clase 72  - CREANDO REGISTEREDCLIENTREPOSITORY DINAMICO👤👤🕵️‍♂🕵️‍♂🔑 🔑
 
-# 🔐 Análisis completo de PartnerRegisteredClientService
+### 🔐 Análisis completo de PartnerRegisteredClientService
 
-## 📋 Consulta 1: ¿Qué es y para qué sirve `RegisteredClientRepository`?
+#### 📋 Consulta 1: ¿Qué es y para qué sirve `RegisteredClientRepository`?
 
-### 🎯 Definición
+##### 🎯 Definición
 `RegisteredClientRepository` es una **interfaz de Spring Authorization Server** que define el contrato para gestionar clientes OAuth2 registrados.
 
-### 🛠️ ¿Para qué sirve?
+##### 🛠️ ¿Para qué sirve?
 Es el **repositorio de configuraciones de clientes OAuth2**. Permite a Spring Security:
 
 - ✅ **Buscar clientes** por su `clientId`
@@ -454,7 +452,7 @@ Es el **repositorio de configuraciones de clientes OAuth2**. Permite a Spring Se
 - ✅ **Buscar clientes** por su `id` interno
 - ✅ **Validar credenciales** durante el flujo OAuth2
 
-### 🔄 Flujo de uso
+##### 🔄 Flujo de uso
 ```
 Cliente hace petición OAuth2
         ↓
@@ -467,7 +465,7 @@ Construye un RegisteredClient con esos datos
 Valida credenciales y genera tokens
 ```
 
-### 📝 Métodos obligatorios
+##### 📝 Métodos obligatorios
 
 | Método | Parámetro | Retorna | Propósito |
 |--------|-----------|---------|-----------|
@@ -475,23 +473,23 @@ Valida credenciales y genera tokens
 | `save` | RegisteredClient | void | Guardar cliente nuevo |
 | `findById` | String id | RegisteredClient | Buscar por ID interno |
 
-### 💡 Analogía
+##### 💡 Analogía
 Es como un **catálogo de aplicaciones autorizadas**. Cada vez que una app intenta autenticarse, Spring busca en este catálogo si existe y qué permisos tiene.
 
 ---
 
-## 📦 Consulta 2: ¿Qué guarda `partnerOpt`?
+#### 📦 Consulta 2: ¿Qué guarda `partnerOpt`?
 
-### 🎯 Respuesta corta
+##### 🎯 Respuesta corta
 **SÍ**, `partnerOpt` es un `Optional<Partner>` que **puede o no contener** el registro de la base de datos que coincide con el `clientId` recibido.
 
-### 🔍 Desglose del flujo
+##### 🔍 Desglose del flujo
 
 ```java
 var partnerOpt = this.partnerRepository.findByClientId(clientId);
 ```
 
-#### Escenario 1: Cliente existe ✅
+##### Escenario 1: Cliente existe ✅
 ```
 Petición: findByClientId("debuggeandoideas")
         ↓
@@ -513,7 +511,7 @@ Encuentra el registro:
 partnerOpt = Optional[Partner{...}]  // Contiene el objeto
 ```
 
-#### Escenario 2: Cliente NO existe ❌
+##### Escenario 2: Cliente NO existe ❌
 ```
 Petición: findByClientId("cliente-inexistente")
         ↓
@@ -524,7 +522,7 @@ No encuentra nada
 partnerOpt = Optional.empty()  // Vacío
 ```
 
-### 📊 Estructura del objeto Partner que se guarda
+##### 📊 Estructura del objeto Partner que se guarda
 
 Basándome en tus datos SQL:
 
@@ -542,7 +540,7 @@ Partner {
 }
 ```
 
-### 🎨 Visualización del Optional
+##### 🎨 Visualización del Optional
 
 ```
 Optional<Partner>
@@ -552,17 +550,17 @@ Optional<Partner>
 
 ---
 
-## 🔄 Consulta 3: ¿Este código transforma un objeto BD en RegisteredClient?
+#### 🔄 Consulta 3: ¿Este código transforma un objeto BD en RegisteredClient?
 
 ```java
 return partnerOpt.map(partner -> 
 ```
 
-### 🎯 Respuesta: **¡Exactamente! SÍ**
+##### 🎯 Respuesta: **¡Exactamente! SÍ**
 
-### 📖 Explicación detallada
+##### 📖 Explicación detallada
 
-#### ¿Qué hace `.map()`?
+##### ¿Qué hace `.map()`?
 
 ```java
 partnerOpt.map(partner -> {
@@ -579,7 +577,7 @@ partnerOpt.map(partner -> {
     - NO ejecuta la lambda
     - Retorna `Optional.empty()`
 
-### 🔄 Flujo de transformación
+##### 🔄 Flujo de transformación
 
 ```
 Partner (Base de datos)          →          RegisteredClient (Spring Security)
@@ -596,7 +594,7 @@ redirectUri: "https://..."       →          redirectUri: "https://..."
 redirectUriLogout: "https://..." →          postLogoutRedirectUri: "https://..."
 ```
 
-### 💻 Código equivalente sin Optional.map()
+##### 💻 Código equivalente sin Optional.map()
 
 ```java
 // Con Optional.map (código actual)
@@ -612,7 +610,7 @@ if (partnerOpt.isPresent()) {
 }
 ```
 
-### 🎯 Ventaja de usar `.map()`
+##### 🎯 Ventaja de usar `.map()`
 - ✅ Código más limpio
 - ✅ Programación funcional
 - ✅ Evita if-else anidados
@@ -620,7 +618,7 @@ if (partnerOpt.isPresent()) {
 
 ---
 
-## 🧩 Consulta 4: Explicación del proceso de transformación de Strings a objetos
+#### 🧩 Consulta 4: Explicación del proceso de transformación de Strings a objetos
 
 ```java
 var authorizationGranTypes = Arrays.stream(partner.getGrandTypes().split(","))
@@ -634,19 +632,19 @@ var clientAuthorizationMethods = Arrays.stream(partner.getAuthenticationMethods(
 var scopes = Arrays.stream(partner.getScopes().split(",")).toList();
 ```
 
-### 🎯 Objetivo general
+##### 🎯 Objetivo general
 Convertir **Strings separados por comas** de la BD en **Listas de objetos** que Spring Security entiende.
 
 ---
 
-### 🔧 Parte 1: `authorizationGranTypes`
+##### 🔧 Parte 1: `authorizationGranTypes`
 
-#### 📥 Entrada (desde BD)
+##### 📥 Entrada (desde BD)
 ```java
 partner.getGrandTypes() = "authorization_code,refresh_token"
 ```
 
-#### 🔄 Proceso paso a paso
+##### 🔄 Proceso paso a paso
 
 ```java
 // Paso 1: Split por comas
@@ -676,7 +674,7 @@ List[
 ]
 ```
 
-#### 📊 Visualización del flujo
+##### 📊 Visualización del flujo
 
 ```
 "authorization_code,refresh_token"  (String en BD)
@@ -761,7 +759,7 @@ var authorizationGranTypes = Arrays.stream(partner.getGrandTypes().split(","))
     .toList();
 ```
 
-### 📈 Ventajas de Streams
+#### 📈 Ventajas de Streams
 - ✅ Menos código
 - ✅ Más legible
 - ✅ Inmutable (`.toList()` crea lista inmutable)
@@ -769,7 +767,7 @@ var authorizationGranTypes = Arrays.stream(partner.getGrandTypes().split(","))
 
 ---
 
-### 🎯 Uso posterior en el builder
+#### 🎯 Uso posterior en el builder
 
 ```java
 .authorizationGrantType(authorizationGranTypes.get(0))  // AUTHORIZATION_CODE
@@ -782,7 +780,7 @@ var authorizationGranTypes = Arrays.stream(partner.getGrandTypes().split(","))
 
 ---
 
-### 📊 Tabla resumen de transformaciones
+#### 📊 Tabla resumen de transformaciones
 
 | Variable | Tipo en BD | Valor BD | Proceso | Tipo final | Valor final |
 |----------|------------|----------|---------|------------|-------------|
@@ -792,7 +790,7 @@ var authorizationGranTypes = Arrays.stream(partner.getGrandTypes().split(","))
 
 ---
 
-## 🎓 Resumen general del algoritmo completo
+#### 🎓 Resumen general del algoritmo completo
 
 ```
 1. Recibe clientId del endpoint
@@ -811,36 +809,36 @@ var authorizationGranTypes = Arrays.stream(partner.getGrandTypes().split(","))
 6. Si NO existe: lanza BadCredentialsException
 ```
 
-# 🛠️ Explicación del código PartnerRegisteredClientService
+### 🛠️ Explicación del código PartnerRegisteredClientService
 
-## 📄 ¿Qué hace esta clase?
+#### 📄 ¿Qué hace esta clase?
 
 `PartnerRegisteredClientService` implementa la interfaz `RegisteredClientRepository` de Spring Authorization Server. Su objetivo es buscar y construir un objeto `RegisteredClient` a partir de los datos almacenados en la base de datos (a través de `PartnerRepository`).
 
-## 🔍 Flujo del método `findByClientId`
+#### 🔍 Flujo del método `findByClientId`
 
-### Recibe un `clientId`:
+#### Recibe un `clientId`:
 El método busca en la base de datos un partner (cliente OAuth2) con ese `clientId`.
 
-### Si existe el partner:
+#### Si existe el partner:
 - Extrae los tipos de grant (`grantTypes`), métodos de autenticación (`authenticationMethods`) y scopes, separando los valores por comas.
 - Crea listas de objetos a partir de esos valores.
 - Construye un objeto `RegisteredClient` usando los datos del partner.
 
-### Si no existe:
+#### Si no existe:
 Lanza una excepción `BadCredentialsException`.
 
-## ⚠️ ¿Por qué hay error en las líneas 44 y 45?
+### ⚠️ ¿Por qué hay error en las líneas 44 y 45?
 
 ```java
 .clientAuthenticationMethod(clientAuthorizationMethods.get(0))
 .clientAuthenticationMethod(clientAuthorizationMethods.get(1))
 ```
 
-### Problema:
+#### Problema:
 El método `clientAuthenticationMethod` espera un objeto de tipo `ClientAuthenticationMethod`, pero tú le estás pasando un objeto de tipo `AuthorizationGrantType`.
 
-### Causa:
+#### Causa:
 En la línea:
 ```java
 var clientAuthorizationMethods = Arrays.stream(partner.getAuthenticationMethods().split(","))
@@ -852,7 +850,7 @@ Estás usando `AuthorizationGrantType::new` en vez de `ClientAuthenticationMetho
 
 Por eso, la lista `clientAuthorizationMethods` contiene objetos del tipo incorrecto.
 
-### Solución:
+#### Solución:
 Debes cambiar esa línea por:
 ```java
 var clientAuthorizationMethods = Arrays.stream(partner.getAuthenticationMethods().split(","))
@@ -860,13 +858,13 @@ var clientAuthorizationMethods = Arrays.stream(partner.getAuthenticationMethods(
     .toList();
 ```
 
-## 📝 Resumen en tabla
+#### 📝 Resumen en tabla
 
 | Línea | Qué hace | Problema | Solución |
 |-------|----------|----------|----------|
 | 44-45 | Añade métodos de autenticación al builder | Usa tipo incorrecto (`AuthorizationGrantType`) | Usar `ClientAuthenticationMethod` |
 
-## 🧩 Ejemplo corregido
+#### 🧩 Ejemplo corregido
 
 ```java
 var clientAuthorizationMethods = Arrays.stream(partner.getAuthenticationMethods().split(","))
@@ -874,14 +872,14 @@ var clientAuthorizationMethods = Arrays.stream(partner.getAuthenticationMethods(
     .toList();
 ```
 
-## 🧠 ¿Cómo funciona el flujo completo?
+### 🧠 ¿Cómo funciona el flujo completo?
 
 1. El cliente OAuth2 hace una petición.
 2. Spring Security llama a `findByClientId` para buscar la configuración del cliente.
 3. Si existe, se construye un `RegisteredClient` con los datos de la base.
 4. Si no, se lanza una excepción.
 
-## 🏁 Conclusión
+### 🏁 Conclusión
 
 - El error es por usar el tipo incorrecto al mapear los métodos de autenticación.
 - Cambia a `ClientAuthenticationMethod::new` para solucionarlo.
@@ -889,11 +887,11 @@ var clientAuthorizationMethods = Arrays.stream(partner.getAuthenticationMethods(
 
 ---
 ## 📝 Clase 73  - CustomerUserDetails 👤🕵️‍♂🕵️‍♂🔑 🔑
-# 🔐 Análisis completo de CustomerUserDetails
+### 🔐 Análisis completo de CustomerUserDetails
 
-## 🔄 Consulta 1: ¿Por qué usar `@Transactional` y cuándo es necesario?
+### 🔄 Consulta 1: ¿Por qué usar `@Transactional` y cuándo es necesario?
 
-### 🎯 ¿Qué hace `@Transactional`?
+#### 🎯 ¿Qué hace `@Transactional`?
 
 `@Transactional` **gestiona transacciones de base de datos** automáticamente. Spring se encarga de:
 
@@ -902,7 +900,7 @@ var clientAuthorizationMethods = Arrays.stream(partner.getAuthenticationMethods(
 - ✅ Hacer rollback si hay una excepción
 - ✅ Cerrar la conexión a la BD
 
-### 📊 Comparación: `CustomerUserDetails` vs `PartnerRegisteredClientService`
+#### 📊 Comparación: `CustomerUserDetails` vs `PartnerRegisteredClientService`
 
 | Aspecto | CustomerUserDetails | PartnerRegisteredClientService |
 |---------|-------------------|-------------------------------|
@@ -913,7 +911,7 @@ var clientAuthorizationMethods = Arrays.stream(partner.getAuthenticationMethods(
 
 ---
 
-### 🔍 ¿Por qué `CustomerUserDetails` SÍ necesita `@Transactional`?
+#### 🔍 ¿Por qué `CustomerUserDetails` SÍ necesita `@Transactional`?
 
 #### 📦 Tu entidad tiene una relación `@OneToMany`:
 
@@ -962,7 +960,7 @@ public class CustomerEntity {
 
 ---
 
-### 🔍 ¿Por qué `PartnerRegisteredClientService` NO necesita `@Transactional`?
+#### 🔍 ¿Por qué `PartnerRegisteredClientService` NO necesita `@Transactional`?
 
 #### 📦 La entidad Partner NO tiene relaciones complejas:
 
@@ -991,7 +989,7 @@ public class Partner {
 
 ---
 
-### 📋 Reglas para decidir cuándo usar `@Transactional`
+#### 📋 Reglas para decidir cuándo usar `@Transactional`
 
 | Situación | ¿Necesita @Transactional? | Razón |
 |-----------|---------------------------|-------|
@@ -1003,7 +1001,7 @@ public class Partner {
 
 ---
 
-### 💡 Ejemplo visual de la diferencia
+#### 💡 Ejemplo visual de la diferencia
 
 #### Con relaciones (CustomerUserDetails):
 ```
@@ -1034,7 +1032,7 @@ Partner
 
 ---
 
-### 🎯 Conclusión de Consulta 1
+#### 🎯 Conclusión de Consulta 1
 
 - **CustomerUserDetails necesita `@Transactional`** porque carga relaciones (`@OneToMany` con roles)
 - **PartnerRegisteredClientService NO necesita `@Transactional`** porque solo hace una lectura simple sin relaciones
@@ -1042,9 +1040,9 @@ Partner
 
 ---
 
-## 🔍 Consulta 2: Explicación del primer `map` y Optional
+### 🔍 Consulta 2: Explicación del primer `map` y Optional
 
-### 🎯 Código analizado:
+#### 🎯 Código analizado:
 
 ```java
 return this.customerRepository.findByEmail(username)
@@ -1053,13 +1051,13 @@ return this.customerRepository.findByEmail(username)
     })
 ```
 
-### ✅ Tu entendimiento es CORRECTO
+#### ✅ Tu entendimiento es CORRECTO
 
 **SÍ**, el `map` transforma un `Optional<CustomerEntity>` en un `Optional<UserDetails>`.
 
 ---
 
-### 📊 Flujo completo paso a paso
+#### 📊 Flujo completo paso a paso
 
 #### 📥 Entrada:
 ```java
@@ -1125,7 +1123,7 @@ Optional.empty()
 
 ---
 
-### 🎨 Visualización del Optional
+#### 🎨 Visualización del Optional
 
 ```
 findByEmail("juan@gmail.com")
@@ -1150,7 +1148,7 @@ Exception
 
 ---
 
-### 💻 Código equivalente sin Optional
+#### 💻 Código equivalente sin Optional
 
 ```java
 // Con Optional.map() (actual)
@@ -1169,7 +1167,7 @@ if (customer != null) {
 
 ---
 
-### 📋 Resumen de Consulta 2
+#### 📋 Resumen de Consulta 2
 
 | Concepto | Explicación |
 |----------|-------------|
@@ -1181,24 +1179,24 @@ if (customer != null) {
 
 ---
 
-## 🎭 Consulta 3: Extracción y transformación de roles
+### 🎭 Consulta 3: Extracción y transformación de roles
 
-### 🎯 Código analizado:
+#### 🎯 Código analizado:
 
 ```java
 final var roles = customer.getRoles();
 final var authorities = roles
 ```
 
-### ✅ Tu entendimiento es CORRECTO
+#### ✅ Tu entendimiento es CORRECTO
 
 **SÍ**, obtienes la lista de roles del customer y luego la conviertes en Stream para transformarla.
 
 ---
 
-### 📊 Flujo detallado
+#### 📊 Flujo detallado
 
-#### 📥 Paso 1: Obtener roles del customer
+##### 📥 Paso 1: Obtener roles del customer
 
 ```java
 final var roles = customer.getRoles();
@@ -1221,7 +1219,7 @@ List<RoleEntity> roles = [
 
 ---
 
-#### 🔄 Paso 2: Convertir a Stream
+##### 🔄 Paso 2: Convertir a Stream
 
 ```java
 final var authorities = roles.stream()
@@ -1249,7 +1247,7 @@ Stream
 
 ---
 
-### 🎯 ¿Por qué convertir a Stream?
+##### 🎯 ¿Por qué convertir a Stream?
 
 Para poder usar **operaciones funcionales** como `map()`, `filter()`, `collect()`:
 
@@ -1262,7 +1260,7 @@ roles.stream()
 
 ---
 
-### 📋 Resumen de Consulta 3
+##### 📋 Resumen de Consulta 3
 
 | Paso | Código | Tipo | Contenido |
 |------|--------|------|-----------|
@@ -1272,9 +1270,9 @@ roles.stream()
 
 ---
 
-## 🔐 Consulta 4: Transformación de roles a authorities y creación de User
+### 🔐 Consulta 4: Transformación de roles a authorities y creación de User
 
-### 🎯 Código completo analizado:
+#### 🎯 Código completo analizado:
 
 ```java
 final var authorities = roles
@@ -1286,7 +1284,7 @@ return new User(customer.getEmail(), customer.getPassword(), authorities);
 
 ---
 
-### 🔄 Paso a paso completo
+#### 🔄 Paso a paso completo
 
 #### 📥 Estado inicial:
 
@@ -1392,7 +1390,7 @@ User{
 
 ---
 
-### 🔑 ¿Qué es `SimpleGrantedAuthority`?
+#### 🔑 ¿Qué es `SimpleGrantedAuthority`?
 
 #### 📖 Definición:
 `SimpleGrantedAuthority` es una **implementación de la interfaz `GrantedAuthority`** de Spring Security que representa un **permiso o rol**.
@@ -1407,7 +1405,7 @@ Spring Security usa `GrantedAuthority` para:
 
 ---
 
-### 📊 Jerarquía de interfaces
+#### 📊 Jerarquía de interfaces
 
 ```
 GrantedAuthority (interfaz)
@@ -1435,7 +1433,7 @@ public class SimpleGrantedAuthority implements GrantedAuthority {
 
 ---
 
-### 🔐 Uso en Spring Security
+#### 🔐 Uso en Spring Security
 
 #### Ejemplo de autorización en un controller:
 
@@ -1465,7 +1463,7 @@ public String userPanel() {
 
 ---
 
-### ❌ Manejo cuando NO se encuentra el usuario
+#### ❌ Manejo cuando NO se encuentra el usuario
 
 ```java
 .orElseThrow(() -> new UsernameNotFoundException("User not found"));
@@ -1492,7 +1490,7 @@ throw new UsernameNotFoundException("User not found")
 
 ---
 
-### 📊 Tabla comparativa de transformaciones
+#### 📊 Tabla comparativa de transformaciones
 
 | Paso | Tipo | Contenido |
 |------|------|-----------|
@@ -1504,7 +1502,7 @@ throw new UsernameNotFoundException("User not found")
 
 ---
 
-### 🎨 Visualización completa del flujo
+#### 🎨 Visualización completa del flujo
 
 ```
 CustomerEntity (BD)
@@ -1531,7 +1529,7 @@ User (Spring Security)
 
 ---
 
-## 🎓 Resumen final del flujo completo
+### 🎓 Resumen final del flujo completo
 
 ```
 1. Usuario ingresa: email + password
@@ -1557,7 +1555,7 @@ User (Spring Security)
 
 ---
 
-## 🏆 Conclusión general
+### 🏆 Conclusión general
 
 - ✅ **@Transactional** es necesario cuando hay relaciones (@OneToMany)
 - ✅ **Optional.map()** transforma CustomerEntity → UserDetails
@@ -1566,9 +1564,9 @@ User (Spring Security)
 - ✅ **User** es la implementación de UserDetails que Spring Security usa para autenticación
 ---
 
-# 🔐 Diferencia entre RegisteredClientRepository y UserDetailsService en OAuth2
+### 🔐 Diferencia entre RegisteredClientRepository y UserDetailsService en OAuth2
 
-## 🎯 Respuesta directa
+### 🎯 Respuesta directa
 
 Son **dos cosas completamente diferentes** que cumplen roles distintos en OAuth2:
 
@@ -1582,7 +1580,7 @@ Son **dos cosas completamente diferentes** que cumplen roles distintos en OAuth2
 
 ---
 
-## 🏗️ Arquitectura OAuth2 - Los 3 actores principales
+###🏗️ Arquitectura OAuth2 - Los 3 actores principales
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -1607,7 +1605,7 @@ Son **dos cosas completamente diferentes** que cumplen roles distintos en OAuth2
 
 ---
 
-## 🔄 Flujo completo OAuth2 - ¿Cuándo se usa cada uno?
+### 🔄 Flujo completo OAuth2 - ¿Cuándo se usa cada uno?
 
 ### 📱 Escenario real: Login con OAuth2
 
@@ -1767,7 +1765,7 @@ Usuario Juan quiere acceder a su cuenta en la app "Debuggeando Ideas"
 
 ---
 
-## 📊 Comparación detallada
+### 📊 Comparación detallada
 
 ### 🖥️ RegisteredClientRepository
 
@@ -1847,7 +1845,7 @@ UserDetails user = userDetailsService
 
 ---
 
-## 🤝 ¿Cómo interactúan en OAuth2?
+### 🤝 ¿Cómo interactúan en OAuth2?
 
 ### 🔄 Secuencia de validaciones
 
@@ -1882,7 +1880,7 @@ UserDetails user = userDetailsService
 
 ---
 
-## 🎭 Analogía del mundo real
+### 🎭 Analogía del mundo real
 
 ### 🏦 Como un banco:
 
@@ -1919,7 +1917,7 @@ a la cuenta bancaria de Juan (USER)
 
 ---
 
-## 📋 Tabla de diferencias clave
+### 📋 Tabla de diferencias clave
 
 | Característica | RegisteredClientRepository | UserDetailsService |
 |----------------|---------------------------|-------------------|
@@ -1934,7 +1932,7 @@ a la cuenta bancaria de Juan (USER)
 
 ---
 
-## 🔐 ¿Por qué son AMBOS necesarios?
+### 🔐 ¿Por qué son AMBOS necesarios?
 
 ### ❌ Sin RegisteredClientRepository:
 
@@ -1977,7 +1975,7 @@ Seguridad completa:
 
 ---
 
-## 🎯 Visualización del token resultante
+### 🎯 Visualización del token resultante
 
 ```json
 {
@@ -1996,7 +1994,7 @@ Seguridad completa:
 
 ---
 
-## 🏁 Conclusión
+### 🏁 Conclusión
 
 ### 🎯 Respuestas directas:
 
