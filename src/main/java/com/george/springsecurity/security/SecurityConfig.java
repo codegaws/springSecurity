@@ -34,5 +34,22 @@ public class SecurityConfig {
         return http.build();
     }
 
+    @Bean
+    @Order(2)
+    SecurityFilterChain clientSecurityFilterChain(HttpSecurity http) throws Exception {
+        http.formLogin(Customizer.withDefaults());
+        http.authorizeHttpRequests(auth ->
+                auth.requestMatchers(ADMIN_RESOURCES).hasAuthority(AUTH_WRITE)
+                        .requestMatchers(USER_RESOURCES).hasAuthority(AUTH_READ)
+                        .anyRequest().permitAll());
+        http.oauth2ResourceServer(oauth ->
+                oauth.jwt(Customizer.withDefaults()));
+        return http.build();
+    }
+
+    private static final String[] USER_RESOURCES = {"/loans/**", "/balance/**"};
+    private static final String[] ADMIN_RESOURCES = {"/accounts/**", "/cards/**"};
+    private static final String AUTH_WRITE = "write";
+    private static final String AUTH_READ = "read";
     private static final String LOGIN_RESOURCE = "/login";
 }
