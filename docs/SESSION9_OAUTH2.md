@@ -2370,7 +2370,7 @@ clientSecurityFilterChain(HttpSecurity http2) { ... }   // ← http2 es diferent
 
 ---
 
-## 🔬 Análisis Profundo de Componentes Clave
+### 🔬 Análisis Profundo de Componentes Clave
 
 ### 📦 1. ¿Qué es `SecurityFilterChain`?
 

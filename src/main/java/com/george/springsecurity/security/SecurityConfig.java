@@ -24,13 +24,11 @@ public class SecurityConfig {
     @Order(1)
     SecurityFilterChain oauth2SecurityFilterChain(HttpSecurity http) throws Exception {
         OAuth2AuthorizationServerConfiguration.applyDefaultSecurity(http);
-
         http.getConfigurer(OAuth2AuthorizationServerConfigurer.class)
                 .oidc(Customizer.withDefaults());
 
         http.exceptionHandling(e ->
                 e.authenticationEntryPoint(new LoginUrlAuthenticationEntryPoint(LOGIN_RESOURCE)));
-
         return http.build();
     }
 
@@ -47,9 +45,21 @@ public class SecurityConfig {
         return http.build();
     }
 
+    @Bean
+    @Order(3)
+    SecurityFilterChain userSecurityFilterChain(HttpSecurity http) throws Exception {
+        http.authorizeHttpRequests(auth ->
+                auth.requestMatchers(ADMIN_RESOURCES).hasRole(ROLE_ADMIN)
+                        .requestMatchers(USER_RESOURCES).hasRole(ROLE_USER)
+                        .anyRequest().permitAll());
+        return http.build();
+    }
+
     private static final String[] USER_RESOURCES = {"/loans/**", "/balance/**"};
     private static final String[] ADMIN_RESOURCES = {"/accounts/**", "/cards/**"};
     private static final String AUTH_WRITE = "write";
     private static final String AUTH_READ = "read";
+    private static final String ROLE_ADMIN = "ADMIN";
+    private static final String ROLE_USER = "USER";
     private static final String LOGIN_RESOURCE = "/login";
 }
