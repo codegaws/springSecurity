@@ -2178,6 +2178,1264 @@ Respuesta
 
 **Buena práctica:** Siempre usa `@Order` cuando tengas múltiples `SecurityFilterChain` para evitar conflictos.
 
+---
+
+### 🔍 ¿Qué captura el parámetro `HttpSecurity http`?
+
+#### 📋 Definición del método
+
+```java
+@Bean
+@Order(1)
+SecurityFilterChain oauth2SecurityFilterChain(HttpSecurity http) throws Exception {
+    // Configuración...
+    return http.build();
+}
+```
+
+#### 🎯 ¿Qué es `HttpSecurity http`?
+
+**`HttpSecurity`** es un objeto proporcionado automáticamente por **Spring Security** mediante **Inyección de Dependencias**.
+
+| Aspecto | Descripción |
+|---------|-------------|
+| **🏗️ Tipo** | Clase builder para configurar seguridad HTTP |
+| **📦 Origen** | Spring Security lo crea y lo inyecta automáticamente |
+| **🔧 Propósito** | Configurar filtros, autenticación, autorización, CSRF, CORS, etc. |
+| **⚙️ Patrón** | Builder Pattern - permite encadenar configuraciones |
+
+---
+
+#### 🚀 ¿Cómo llega el parámetro `HttpSecurity http`?
+
+**Spring Boot hace la "magia" de inyección:**
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  1. Spring Boot detecta que SecurityConfig tiene @Configuration │
+└───────────────────────────┬─────────────────────────────────────┘
+                            │
+                            ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  2. Spring Security crea una instancia de HttpSecurity          │
+│     (configurada con valores por defecto)                       │
+└───────────────────────────┬─────────────────────────────────────┘
+                            │
+                            ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  3. Spring llama a tu método oauth2SecurityFilterChain()        │
+│     y le PASA el objeto HttpSecurity como parámetro             │
+└───────────────────────────┬─────────────────────────────────────┘
+                            │
+                            ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  4. Tú personalizas la configuración con .authorizeHttpRequests │
+│     .formLogin(), .oauth2Login(), etc.                          │
+└───────────────────────────┬─────────────────────────────────────┘
+                            │
+                            ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  5. Llamas a http.build() que retorna un SecurityFilterChain   │
+└───────────────────────────┬─────────────────────────────────────┘
+                            │
+                            ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  6. Spring registra ese SecurityFilterChain en el contenedor    │
+│     y lo aplica a todas las peticiones HTTP                     │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+#### 🔧 ¿Qué contiene `HttpSecurity` cuando llega?
+
+Cuando Spring te pasa el objeto `HttpSecurity`, ya viene **pre-configurado** con:
+
+```java
+HttpSecurity http = ... // Creado por Spring
+
+// Configuración por defecto incluye:
+✅ FilterChainProxy configurado
+✅ SecurityContextHolder inicializado
+✅ AuthenticationManager disponible
+✅ Filtros básicos de seguridad registrados
+✅ Configuración de sesiones HTTP
+```
+
+**Tú lo personalizas** agregando configuraciones específicas:
+
+```java
+// ANTES de tu configuración (valores por defecto)
+http = {
+    filters: [básicos de Spring Security],
+    authenticationManager: default,
+    sessionManagement: default,
+    csrf: habilitado por defecto,
+    cors: deshabilitado por defecto
+}
+
+// DESPUÉS de tu configuración
+OAuth2AuthorizationServerConfiguration.applyDefaultSecurity(http);
+http.getConfigurer(OAuth2AuthorizationServerConfigurer.class)
+    .oidc(Customizer.withDefaults());
+
+// Ahora http contiene:
+http = {
+    filters: [OAuth2, OIDC, básicos],
+    authenticationManager: OAuth2 configurado,
+    endpoints: [/oauth2/token, /oauth2/authorize, ...],
+    csrf: configuración personalizada,
+    exceptionHandling: LoginUrlAuthenticationEntryPoint
+}
+```
+
+---
+
+#### 🎭 Comparación con otros frameworks
+
+| Framework | ¿Cómo se pasa la configuración? |
+|-----------|----------------------------------|
+| **Spring Security** | `HttpSecurity http` (inyección automática) |
+| **Express.js** | `app.use(middleware)` (manual) |
+| **Django** | `MIDDLEWARE` en settings.py (manual) |
+| **ASP.NET Core** | `IApplicationBuilder app` (inyección) |
+
+---
+
+#### 💡 Ejemplo práctico completo
+
+```java
+@Configuration
+public class SecurityConfig {
+
+    @Bean
+    @Order(1)
+    SecurityFilterChain oauth2SecurityFilterChain(HttpSecurity http) throws Exception {
+        // 👇 http viene PRE-CONFIGURADO por Spring
+        // Tú solo lo PERSONALIZAS
+        
+        OAuth2AuthorizationServerConfiguration.applyDefaultSecurity(http);
+        
+        http.getConfigurer(OAuth2AuthorizationServerConfigurer.class)
+                .oidc(Customizer.withDefaults());
+        
+        http.exceptionHandling(e ->
+                e.authenticationEntryPoint(new LoginUrlAuthenticationEntryPoint("/login")));
+        
+        // 👇 Construyes y retornas el SecurityFilterChain personalizado
+        return http.build();
+    }
+    
+    @Bean
+    @Order(2)
+    SecurityFilterChain clientSecurityFilterChain(HttpSecurity http) throws Exception {
+        // 👇 Spring crea OTRA instancia de HttpSecurity para este filtro
+        // (diferente al del método anterior)
+        
+        http.authorizeHttpRequests(auth -> 
+                auth.requestMatchers("/public/**").permitAll()
+                    .anyRequest().authenticated())
+            .oauth2ResourceServer(oauth2 -> oauth2.jwt(Customizer.withDefaults()));
+        
+        return http.build();
+    }
+}
+```
+
+#### ⚠️ Nota Importante
+
+**Cada método `@Bean` que retorna `SecurityFilterChain` recibe su PROPIA instancia de `HttpSecurity`:**
+
+```java
+// ❌ ESTO NO COMPARTE EL MISMO http
+oauth2SecurityFilterChain(HttpSecurity http1) { ... }  // ← http1 es diferente
+clientSecurityFilterChain(HttpSecurity http2) { ... }   // ← http2 es diferente
+```
+
+**Por eso necesitas `@Order` para definir cuál evalúa primero.**
+
+---
+
+#### 🎯 Resumen Final
+
+| Pregunta | Respuesta |
+|----------|-----------|
+| **¿Qué es `HttpSecurity`?** | Un objeto builder para configurar seguridad HTTP |
+| **¿Quién lo crea?** | Spring Security automáticamente |
+| **¿Cómo llega al método?** | Por inyección de dependencias |
+| **¿Qué contiene?** | Configuración por defecto de filtros, autenticación, autorización |
+| **¿Para qué sirve?** | Personalizar la cadena de filtros de seguridad |
+| **¿Es el mismo objeto en todos los @Bean?** | NO, cada método recibe su propia instancia |
+
+
+---
+
+## 🔬 Análisis Profundo de Componentes Clave
+
+### 📦 1. ¿Qué es `SecurityFilterChain`?
+
+#### 🏗️ Definición Técnica
+
+```java
+@FunctionalInterface
+public interface SecurityFilterChain {
+    boolean matches(HttpServletRequest request);
+    List<Filter> getFilters();
+}
+```
+
+**`SecurityFilterChain` es una INTERFACE** (no una clase) que define un contrato para cadenas de filtros de seguridad.
+
+---
+
+#### 🎯 Estructura de la Interface
+
+| Método | Tipo de Retorno | Descripción |
+|--------|----------------|-------------|
+| **`matches(HttpServletRequest)`** | `boolean` | ¿Esta cadena debe procesar esta petición? |
+| **`getFilters()`** | `List<Filter>` | Lista de filtros a aplicar si `matches()` retorna `true` |
+
+---
+
+#### 🔍 ¿Cómo funciona internamente?
+
+```
+Petición HTTP entrante
+        ↓
+┌───────────────────────────────────────┐
+│  FilterChainProxy (Spring Security)   │
+└───────────────┬───────────────────────┘
+                │
+                ▼
+    ┌───────────────────────────┐
+    │  Itera sobre TODOS los    │
+    │  SecurityFilterChain      │
+    │  registrados como @Bean   │
+    └───────────┬───────────────┘
+                │
+                ▼
+    ┌─────────────────────────────────────┐
+    │  Pregunta a cada uno:               │
+    │  ¿matches(request)?                 │
+    └─────┬────────────────────┬──────────┘
+          │                    │
+    ┌─────▼─────┐        ┌────▼──────┐
+    │  Chain 1  │        │  Chain 2  │
+    │ @Order(1) │        │ @Order(2) │
+    └─────┬─────┘        └────┬──────┘
+          │                   │
+    ¿matches()?          ¿matches()?
+          │                   │
+      ✅ SÍ               ❌ NO
+          │                   │
+          ▼                   ▼
+    getFilters()         Ignora este chain
+    Ejecuta filtros
+```
+
+---
+
+#### 💻 Implementación Real (lo que crea `http.build()`)
+
+Cuando haces `http.build()`, Spring crea internamente una clase que implementa `SecurityFilterChain`:
+
+```java
+// Código simplificado de lo que Spring crea internamente
+class DefaultSecurityFilterChain implements SecurityFilterChain {
+    
+    private final RequestMatcher requestMatcher;
+    private final List<Filter> filters;
+    
+    public DefaultSecurityFilterChain(RequestMatcher matcher, List<Filter> filters) {
+        this.requestMatcher = matcher;
+        this.filters = filters;
+    }
+    
+    @Override
+    public boolean matches(HttpServletRequest request) {
+        return requestMatcher.matches(request);
+    }
+    
+    @Override
+    public List<Filter> getFilters() {
+        return this.filters;
+    }
+}
+```
+
+---
+
+#### 🎬 Ejemplo Real con tu Código
+
+```java
+@Bean
+@Order(1)
+SecurityFilterChain oauth2SecurityFilterChain(HttpSecurity http) throws Exception {
+    OAuth2AuthorizationServerConfiguration.applyDefaultSecurity(http);
+    return http.build();
+}
+```
+
+**Lo que Spring crea internamente:**
+
+```java
+DefaultSecurityFilterChain {
+    requestMatcher: matches("/oauth2/**", "/.well-known/**"),
+    filters: [
+        OAuth2AuthorizationEndpointFilter,      // /oauth2/authorize
+        OAuth2TokenEndpointFilter,              // /oauth2/token
+        OAuth2TokenIntrospectionEndpointFilter, // /oauth2/introspect
+        OAuth2TokenRevocationEndpointFilter,    // /oauth2/revoke
+        OidcProviderConfigurationEndpointFilter,// /.well-known/openid-configuration
+        OidcUserInfoEndpointFilter,             // /userinfo
+        // ... más filtros OAuth2
+    ]
+}
+```
+
+---
+
+#### 🆚 Comparación: Interface vs Clase
+
+| Aspecto | `SecurityFilterChain` | Clase Concreta |
+|---------|----------------------|----------------|
+| **Tipo** | Interface | Clase |
+| **¿Se puede instanciar?** | ❌ No directamente | ✅ Sí |
+| **Implementación** | Spring la proporciona con `http.build()` | Ya tiene código |
+| **Flexibilidad** | Puedes tener múltiples implementaciones | Una sola implementación |
+
+---
+
+#### 🔗 Relación con otros componentes
+
+```
+┌─────────────────────────────────────────────────┐
+│          SecurityFilterChain                    │
+│             (Interface)                         │
+└────────────────┬────────────────────────────────┘
+                 │
+                 │ implementada por
+                 ▼
+┌─────────────────────────────────────────────────┐
+│     DefaultSecurityFilterChain                  │
+│            (Clase)                              │
+└────────────────┬────────────────────────────────┘
+                 │
+                 │ contiene
+                 ▼
+┌─────────────────────────────────────────────────┐
+│         List<Filter>                            │
+│  ┌──────────────────────────────────────┐      │
+│  │ OAuth2TokenEndpointFilter            │      │
+│  │ UsernamePasswordAuthenticationFilter │      │
+│  │ BasicAuthenticationFilter            │      │
+│  │ AuthorizationFilter                  │      │
+│  └──────────────────────────────────────┘      │
+└─────────────────────────────────────────────────┘
+```
+
+---
+
+#### ✅ Verificación Práctica
+
+Puedes ver los filtros que se registran habilitando logs:
+
+```properties
+# application.properties
+logging.level.org.springframework.security=TRACE
+```
+
+**Output esperado:**
+
+```
+Creating filter chain: Ant [pattern='/oauth2/**'], [
+  OAuth2AuthorizationEndpointFilter,
+  OAuth2TokenEndpointFilter,
+  ...
+]
+```
+
+---
+
+### 🛠️ 2. `OAuth2AuthorizationServerConfiguration.applyDefaultSecurity(http)`
+
+#### 📋 Definición
+
+```java
+public final class OAuth2AuthorizationServerConfiguration {
+    
+    public static void applyDefaultSecurity(HttpSecurity http) throws Exception {
+        OAuth2AuthorizationServerConfigurer authorizationServerConfigurer =
+            new OAuth2AuthorizationServerConfigurer();
+        
+        http.apply(authorizationServerConfigurer);
+        
+        // Configura RequestMatcher para endpoints OAuth2
+        RequestMatcher endpointsMatcher = authorizationServerConfigurer.getEndpointsMatcher();
+        
+        http
+            .securityMatcher(endpointsMatcher)
+            .authorizeHttpRequests(authorize ->
+                authorize.anyRequest().authenticated()
+            )
+            .csrf(csrf -> csrf.ignoringRequestMatchers(endpointsMatcher))
+            .exceptionHandling(exceptions ->
+                exceptions.defaultAuthenticationEntryPointFor(
+                    new LoginUrlAuthenticationEntryPoint("/login"),
+                    new MediaTypeRequestMatcher(MediaType.TEXT_HTML)
+                )
+            );
+    }
+}
+```
+
+---
+
+#### 🎯 ¿Qué hace este método paso a paso?
+
+##### Paso 1: Crea el Configurador OAuth2
+
+```java
+OAuth2AuthorizationServerConfigurer authorizationServerConfigurer =
+    new OAuth2AuthorizationServerConfigurer();
+```
+
+Este objeto contiene toda la configuración para endpoints OAuth2.
+
+---
+
+##### Paso 2: Aplica el Configurador a HttpSecurity
+
+```java
+http.apply(authorizationServerConfigurer);
+```
+
+Esto registra INTERNAMENTE los siguientes filtros:
+
+| Filtro | Endpoint | Función |
+|--------|----------|---------|
+| **`OAuth2AuthorizationEndpointFilter`** | `/oauth2/authorize` | Inicia el flujo de autorización (Authorization Code) |
+| **`OAuth2TokenEndpointFilter`** | `/oauth2/token` | 🎫 **Genera y retorna tokens de acceso** |
+| **`OAuth2TokenIntrospectionEndpointFilter`** | `/oauth2/introspect` | Verifica si un token es válido |
+| **`OAuth2TokenRevocationEndpointFilter`** | `/oauth2/revoke` | Revoca (invalida) un token |
+| **`JwkSetEndpointFilter`** | `/oauth2/jwks` | Expone claves públicas JWK para validar JWT |
+
+---
+
+##### Paso 3: Define qué Rutas Captura
+
+```java
+RequestMatcher endpointsMatcher = authorizationServerConfigurer.getEndpointsMatcher();
+http.securityMatcher(endpointsMatcher);
+```
+
+**Este `RequestMatcher` captura las siguientes rutas:**
+
+```java
+// Internamente crea un matcher así:
+OrRequestMatcher(
+    AntPathRequestMatcher("/oauth2/authorize"),
+    AntPathRequestMatcher("/oauth2/token"),
+    AntPathRequestMatcher("/oauth2/introspect"),
+    AntPathRequestMatcher("/oauth2/revoke"),
+    AntPathRequestMatcher("/oauth2/jwks"),
+    AntPathRequestMatcher("/.well-known/oauth-authorization-server"),
+    AntPathRequestMatcher("/.well-known/openid-configuration")  // Si OIDC está habilitado
+)
+```
+
+---
+
+##### Paso 4: Requiere Autenticación
+
+```java
+http.authorizeHttpRequests(authorize ->
+    authorize.anyRequest().authenticated()
+);
+```
+
+**Significado:** Todas las rutas de OAuth2 requieren que el cliente esté autenticado.
+
+---
+
+##### Paso 5: Desactiva CSRF para Endpoints OAuth2
+
+```java
+http.csrf(csrf -> csrf.ignoringRequestMatchers(endpointsMatcher));
+```
+
+**¿Por qué?** Los clientes OAuth2 (aplicaciones) no pueden enviar tokens CSRF, por eso se desactiva para estas rutas.
+
+---
+
+##### Paso 6: Configura Redirección de Login
+
+```java
+http.exceptionHandling(exceptions ->
+    exceptions.defaultAuthenticationEntryPointFor(
+        new LoginUrlAuthenticationEntryPoint("/login"),
+        new MediaTypeRequestMatcher(MediaType.TEXT_HTML)
+    )
+);
+```
+
+**Significado:** Si un usuario **sin autenticar** intenta acceder a `/oauth2/authorize`, lo redirige a `/login`.
+
+---
+
+#### 📊 Comparación Visual: ANTES vs DESPUÉS de `applyDefaultSecurity`
+
+##### ANTES de llamar al método:
+
+```java
+HttpSecurity http = ...;  // Configuración básica de Spring Security
+
+// Endpoints disponibles:
+❌ /oauth2/token       → No existe
+❌ /oauth2/authorize   → No existe
+❌ /oauth2/jwks        → No existe
+```
+
+##### DESPUÉS de llamar al método:
+
+```java
+OAuth2AuthorizationServerConfiguration.applyDefaultSecurity(http);
+
+// Endpoints disponibles:
+✅ /oauth2/token       → Genera tokens
+✅ /oauth2/authorize   → Autoriza clientes
+✅ /oauth2/introspect  → Valida tokens
+✅ /oauth2/revoke      → Revoca tokens
+✅ /oauth2/jwks        → Claves públicas JWK
+✅ /.well-known/oauth-authorization-server → Metadata del servidor
+```
+
+---
+
+#### 🧪 Prueba Práctica
+
+**Sin `applyDefaultSecurity`:**
+
+```bash
+curl -X POST http://localhost:8080/oauth2/token
+# Resultado: 404 Not Found
+```
+
+**Con `applyDefaultSecurity`:**
+
+```bash
+curl -X POST http://localhost:8080/oauth2/token \
+  -d "grant_type=client_credentials" \
+  -d "client_id=client" \
+  -d "client_secret=secret"
+
+# Resultado: 
+{
+  "access_token": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "token_type": "Bearer",
+  "expires_in": 3600
+}
+```
+
+---
+
+### 🔧 3. `http.getConfigurer(OAuth2AuthorizationServerConfigurer.class)`
+
+#### 📋 ¿Qué hace `getConfigurer()`?
+
+```java
+http.getConfigurer(OAuth2AuthorizationServerConfigurer.class)
+    .oidc(Customizer.withDefaults());
+```
+
+---
+
+#### 🔍 Análisis Técnico
+
+##### 1. **¿Qué es un Configurer?**
+
+Un **Configurer** es un objeto que personaliza un aspecto específico de `HttpSecurity`.
+
+```java
+// Estructura simplificada
+public abstract class AbstractHttpConfigurer<T, B> {
+    public abstract void configure(B builder);
+}
+
+// OAuth2AuthorizationServerConfigurer extiende esto
+public final class OAuth2AuthorizationServerConfigurer 
+    extends AbstractHttpConfigurer<OAuth2AuthorizationServerConfigurer, HttpSecurity> {
+    
+    // Métodos de configuración
+    public OAuth2AuthorizationServerConfigurer oidc(Customizer<OidcConfigurer> customizer) {
+        // Habilita OIDC
+    }
+    
+    public OAuth2AuthorizationServerConfigurer tokenEndpoint(Customizer<...> customizer) {
+        // Personaliza endpoint de tokens
+    }
+    
+    // ... más métodos
+}
+```
+
+---
+
+##### 2. **¿Cómo funciona `getConfigurer()`?**
+
+```java
+// Implementación interna de HttpSecurity
+public <C extends AbstractHttpConfigurer<C, B>> C getConfigurer(Class<C> clazz) {
+    // Busca en un Map interno de configurers registrados
+    return configurers.get(clazz);
+}
+```
+
+**Flujo:**
+
+```
+OAuth2AuthorizationServerConfiguration.applyDefaultSecurity(http)
+    ↓
+Registra OAuth2AuthorizationServerConfigurer en http
+    ↓
+http.getConfigurer(OAuth2AuthorizationServerConfigurer.class)
+    ↓
+Retorna la instancia registrada
+    ↓
+.oidc(Customizer.withDefaults())
+    ↓
+Personaliza el configurer con OIDC
+```
+
+---
+
+##### 3. **¿Por qué usar `getConfigurer()`?**
+
+**Sin `getConfigurer()`:**
+
+```java
+// ❌ NO FUNCIONA - El configurer no está disponible directamente
+OAuth2AuthorizationServerConfigurer configurer = new OAuth2AuthorizationServerConfigurer();
+configurer.oidc(Customizer.withDefaults());  // ❌ Esto no se aplica a http
+```
+
+**Con `getConfigurer()`:**
+
+```java
+// ✅ FUNCIONA - Obtiene el configurer YA REGISTRADO en http
+http.getConfigurer(OAuth2AuthorizationServerConfigurer.class)
+    .oidc(Customizer.withDefaults());  // ✅ Se aplica directamente
+```
+
+---
+
+#### 🎯 Métodos Disponibles en `OAuth2AuthorizationServerConfigurer`
+
+| Método | Descripción | Ejemplo |
+|--------|-------------|---------|
+| **`oidc()`** | Habilita OpenID Connect | `.oidc(Customizer.withDefaults())` |
+| **`tokenEndpoint()`** | Personaliza endpoint `/oauth2/token` | `.tokenEndpoint(endpoint -> endpoint.accessTokenResponseHandler(...))` |
+| **`authorizationEndpoint()`** | Personaliza endpoint `/oauth2/authorize` | `.authorizationEndpoint(endpoint -> endpoint.consentPage("/custom-consent"))` |
+| **`clientAuthentication()`** | Configura autenticación de clientes | `.clientAuthentication(auth -> auth.authenticationConverter(...))` |
+
+---
+
+### 🌐 4. `.oidc(Customizer.withDefaults())`
+
+#### 📋 ¿Qué es OIDC?
+
+**OIDC (OpenID Connect)** es una capa de identidad construida sobre OAuth2.
+
+| Característica | OAuth2 | OAuth2 + OIDC |
+|----------------|--------|---------------|
+| **Propósito** | 🔑 Autorización (permisos) | 👤 Autenticación (identidad) + Autorización |
+| **Token principal** | Access Token | Access Token + **ID Token** |
+| **Información del usuario** | No estandarizada | Endpoint `/userinfo` estándar |
+| **Flujo** | Solo OAuth2 | OAuth2 + datos de usuario |
+
+---
+
+#### 🎫 ¿Qué agrega `.oidc(Customizer.withDefaults())`?
+
+##### 1. **ID Token**
+
+Además del Access Token, se genera un **ID Token** que contiene información del usuario:
+
+```json
+// ID Token (JWT decodificado)
+{
+  "sub": "admin@example.com",           // Subject (usuario)
+  "name": "George Admin",
+  "email": "admin@example.com",
+  "email_verified": true,
+  "iat": 1708176000,                    // Issued at
+  "exp": 1708179600,                    // Expiration
+  "iss": "http://localhost:8080",       // Issuer (tu servidor)
+  "aud": "client-id"                    // Audience (cliente)
+}
+```
+
+---
+
+##### 2. **Endpoint `/userinfo`**
+
+```bash
+curl -X GET http://localhost:8080/userinfo \
+  -H "Authorization: Bearer <access_token>"
+
+# Respuesta:
+{
+  "sub": "admin@example.com",
+  "name": "George Admin",
+  "email": "admin@example.com",
+  "roles": ["ADMIN"]
+}
+```
+
+---
+
+##### 3. **Endpoint `/.well-known/openid-configuration`**
+
+Este endpoint expone la configuración del servidor:
+
+```bash
+curl http://localhost:8080/.well-known/openid-configuration
+
+# Respuesta:
+{
+  "issuer": "http://localhost:8080",
+  "authorization_endpoint": "http://localhost:8080/oauth2/authorize",
+  "token_endpoint": "http://localhost:8080/oauth2/token",
+  "userinfo_endpoint": "http://localhost:8080/userinfo",
+  "jwks_uri": "http://localhost:8080/oauth2/jwks",
+  "response_types_supported": ["code", "token"],
+  "grant_types_supported": ["authorization_code", "client_credentials", "refresh_token"],
+  "subject_types_supported": ["public"],
+  "id_token_signing_alg_values_supported": ["RS256"]
+}
+```
+
+---
+
+#### 🔧 Configuración Interna de `oidc(Customizer.withDefaults())`
+
+**Lo que hace internamente:**
+
+```java
+// Código simplificado
+public OAuth2AuthorizationServerConfigurer oidc(Customizer<OidcConfigurer> customizer) {
+    
+    OidcConfigurer oidcConfigurer = new OidcConfigurer();
+    
+    // Customizer.withDefaults() aplica configuración por defecto:
+    oidcConfigurer
+        .providerConfigurationEndpoint(config -> config
+            .providerConfigurationCustomizer(builder -> {
+                // Registra /.well-known/openid-configuration
+            })
+        )
+        .userInfoEndpoint(userInfo -> userInfo
+            // Registra /userinfo
+            .userInfoMapper(context -> {
+                // Extrae información del usuario desde la BD
+            })
+        );
+    
+    customizer.customize(oidcConfigurer);
+    
+    return this;
+}
+```
+
+---
+
+#### 🆚 Comparación: OAuth2 vs OAuth2 + OIDC
+
+##### **Sin OIDC:**
+
+```java
+OAuth2AuthorizationServerConfiguration.applyDefaultSecurity(http);
+// No llamas a .oidc()
+```
+
+**Endpoints disponibles:**
+- ✅ `/oauth2/token`
+- ✅ `/oauth2/authorize`
+- ❌ `/userinfo` (no existe)
+- ❌ `/.well-known/openid-configuration` (no existe)
+
+**Respuesta de token:**
+```json
+{
+  "access_token": "eyJhbGciOi...",
+  "token_type": "Bearer",
+  "expires_in": 3600
+  // ❌ Sin ID Token
+}
+```
+
+---
+
+##### **Con OIDC:**
+
+```java
+OAuth2AuthorizationServerConfiguration.applyDefaultSecurity(http);
+http.getConfigurer(OAuth2AuthorizationServerConfigurer.class)
+    .oidc(Customizer.withDefaults());
+```
+
+**Endpoints disponibles:**
+- ✅ `/oauth2/token`
+- ✅ `/oauth2/authorize`
+- ✅ `/userinfo`
+- ✅ `/.well-known/openid-configuration`
+
+**Respuesta de token:**
+```json
+{
+  "access_token": "eyJhbGciOi...",
+  "token_type": "Bearer",
+  "expires_in": 3600,
+  "id_token": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...",  // ✅ ID Token incluido
+  "scope": "openid profile email"
+}
+```
+
+---
+
+### ⚙️ 5. `Customizer.withDefaults()`
+
+#### 📋 ¿Qué es `Customizer`?
+
+```java
+@FunctionalInterface
+public interface Customizer<T> {
+    void customize(T t);
+    
+    static <T> Customizer<T> withDefaults() {
+        return (t) -> {};  // Lambda vacía = no personaliza nada
+    }
+}
+```
+
+**`Customizer` es una interface funcional** para personalizar componentes.
+
+---
+
+#### 🎯 ¿Qué significa `withDefaults()`?
+
+```java
+Customizer.withDefaults()
+
+// Es equivalente a:
+(config) -> {}  // Lambda vacía, NO hace nada
+
+// Significa: "Usa la configuración POR DEFECTO, no la personalices"
+```
+
+---
+
+#### 🔄 Comparación: `withDefaults()` vs Personalización
+
+##### **Con valores por defecto:**
+
+```java
+http.formLogin(Customizer.withDefaults());
+
+// Configuración aplicada:
+// - URL de login: /login
+// - URL de éxito: /
+// - URL de error: /login?error
+// - Campos: username, password
+```
+
+##### **Con personalización:**
+
+```java
+http.formLogin(form -> form
+    .loginPage("/mi-login")              // ← URL personalizada
+    .loginProcessingUrl("/autenticar")    // ← Endpoint personalizado
+    .defaultSuccessUrl("/dashboard")      // ← Redirección personalizada
+    .failureUrl("/error-login")           // ← Error personalizado
+);
+
+// Ahora usa TUS valores personalizados
+```
+
+---
+
+#### 💡 Ejemplos Prácticos
+
+##### Ejemplo 1: OIDC con Valores por Defecto
+
+```java
+.oidc(Customizer.withDefaults());
+
+// Equivalente a:
+.oidc(oidc -> {});
+
+// Usa configuración estándar de OIDC
+```
+
+---
+
+##### Ejemplo 2: OIDC Personalizado
+
+```java
+.oidc(oidc -> oidc
+    .userInfoEndpoint(userInfo -> userInfo
+        .userInfoMapper(context -> {
+            // Personaliza cómo se mapea la información del usuario
+            return Map.of(
+                "sub", context.getAuthorization().getPrincipalName(),
+                "custom_field", "valor personalizado"
+            );
+        })
+    )
+);
+
+// Ahora /userinfo retorna datos personalizados
+```
+
+---
+
+#### 📊 Tabla Comparativa de Uso
+
+| Código | Significado | Configuración Aplicada |
+|--------|-------------|------------------------|
+| `Customizer.withDefaults()` | Usa valores por defecto | Spring decide todo |
+| `config -> {}` | Igual que `withDefaults()` | Spring decide todo |
+| `config -> config.algo(...)` | Personalización parcial | Mezcla de Spring + tuyo |
+| `config -> config.todo(...)...` | Personalización total | Solo usa tus valores |
+
+---
+
+#### 🎓 Resumen de Conceptos
+
+| Concepto | ¿Qué es? | ¿Para qué sirve? |
+|----------|----------|------------------|
+| **`SecurityFilterChain`** | Interface con 2 métodos: `matches()` y `getFilters()` | Define una cadena de filtros para procesar peticiones |
+| **`OAuth2AuthorizationServerConfiguration.applyDefaultSecurity()`** | Método estático que configura endpoints OAuth2 | Registra filtros para `/oauth2/token`, `/oauth2/authorize`, etc. |
+| **`getConfigurer()`** | Método de `HttpSecurity` que retorna un configurer registrado | Permite personalizar configuración OAuth2 ya aplicada |
+| **`.oidc()`** | Método que habilita OpenID Connect | Agrega `/userinfo`, ID Token, `/.well-known/openid-configuration` |
+| **`Customizer.withDefaults()`** | Lambda vacía `(t) -> {}` | Usa configuración por defecto sin personalizaciones |
+
+---
+
+### 🎨 Diagrama de Flujo Completo: Interconexión de Todos los Conceptos
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                    INICIO: Spring Boot Arranca                                  │
+└────────────────────────────────┬────────────────────────────────────────────────┘
+                                 │
+                                 ▼
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│  Spring detecta @Configuration y métodos @Bean que retornan SecurityFilterChain │
+└────────────────────────────────┬────────────────────────────────────────────────┘
+                                 │
+                ┌────────────────┴────────────────┐
+                │                                 │
+                ▼                                 ▼
+┌───────────────────────────────┐   ┌───────────────────────────────┐
+│   @Bean @Order(1)             │   │   @Bean @Order(2)             │
+│   oauth2SecurityFilterChain   │   │   clientSecurityFilterChain   │
+└───────────────┬───────────────┘   └───────────────┬───────────────┘
+                │                                   │
+                ▼                                   ▼
+┌───────────────────────────────┐   ┌───────────────────────────────┐
+│  Spring crea HttpSecurity #1  │   │  Spring crea HttpSecurity #2  │
+│  (instancia diferente)        │   │  (instancia diferente)        │
+└───────────────┬───────────────┘   └───────────────┬───────────────┘
+                │                                   │
+                ▼                                   ▼
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│  PASO 1: OAuth2AuthorizationServerConfiguration.applyDefaultSecurity(http #1)   │
+│  ═══════════════════════════════════════════════════════════════════════════    │
+│  • Crea OAuth2AuthorizationServerConfigurer                                     │
+│  • Registra filtros:                                                            │
+│    - OAuth2TokenEndpointFilter           → /oauth2/token                       │
+│    - OAuth2AuthorizationEndpointFilter   → /oauth2/authorize                   │
+│    - OAuth2TokenIntrospectionEndpointFilter → /oauth2/introspect               │
+│    - OAuth2TokenRevocationEndpointFilter → /oauth2/revoke                      │
+│    - JwkSetEndpointFilter                → /oauth2/jwks                        │
+│  • Define RequestMatcher para /oauth2/**                                        │
+│  • Requiere autenticación para todas las rutas                                  │
+│  • Desactiva CSRF para endpoints OAuth2                                         │
+└───────────────┬─────────────────────────────────────────────────────────────────┘
+                │
+                ▼
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│  PASO 2: http.getConfigurer(OAuth2AuthorizationServerConfigurer.class)         │
+│  ═══════════════════════════════════════════════════════════════════════════    │
+│  • Busca en Map interno de configurers                                          │
+│  • Retorna la instancia registrada en PASO 1                                    │
+└───────────────┬─────────────────────────────────────────────────────────────────┘
+                │
+                ▼
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│  PASO 3: .oidc(Customizer.withDefaults())                                       │
+│  ═══════════════════════════════════════════════════════════════════════════    │
+│  • withDefaults() = lambda vacía: (config) -> {}                                │
+│  • Activa OpenID Connect con configuración por defecto                          │
+│  • Registra filtros adicionales:                                                │
+│    - OidcProviderConfigurationEndpointFilter → /.well-known/openid-configuration│
+│    - OidcUserInfoEndpointFilter              → /userinfo                        │
+│  • Habilita generación de ID Token (además de Access Token)                     │
+└───────────────┬─────────────────────────────────────────────────────────────────┘
+                │
+                ▼
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│  PASO 4: http.exceptionHandling(...)                                            │
+│  ═══════════════════════════════════════════════════════════════════════════    │
+│  • Configura redirección a /login si no hay autenticación                       │
+└───────────────┬─────────────────────────────────────────────────────────────────┘
+                │
+                ▼
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│  PASO 5: return http.build()                                                    │
+│  ═══════════════════════════════════════════════════════════════════════════    │
+│  • Construye una instancia de DefaultSecurityFilterChain                        │
+│  • Implementa la interface SecurityFilterChain:                                 │
+│    ├─ matches(request): ¿Esta request es /oauth2/** o /.well-known/**?        │
+│    └─ getFilters(): Lista de TODOS los filtros configurados                     │
+└───────────────┬─────────────────────────────────────────────────────────────────┘
+                │
+                ▼
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│  RESULTADO: SecurityFilterChain #1                                              │
+│  ═══════════════════════════════════════════════════════════════════════════    │
+│  DefaultSecurityFilterChain {                                                   │
+│    requestMatcher: OrRequestMatcher(                                            │
+│      "/oauth2/token",                                                           │
+│      "/oauth2/authorize",                                                       │
+│      "/oauth2/introspect",                                                      │
+│      "/oauth2/revoke",                                                          │
+│      "/oauth2/jwks",                                                            │
+│      "/.well-known/openid-configuration",                                       │
+│      "/userinfo"                                                                │
+│    ),                                                                           │
+│    filters: [                                                                   │
+│      OAuth2TokenEndpointFilter,                                                 │
+│      OAuth2AuthorizationEndpointFilter,                                         │
+│      OidcProviderConfigurationEndpointFilter,                                   │
+│      OidcUserInfoEndpointFilter,                                                │
+│      JwkSetEndpointFilter,                                                      │
+│      // ... más filtros                                                         │
+│    ]                                                                            │
+│  }                                                                              │
+└───────────────┬─────────────────────────────────────────────────────────────────┘
+                │
+                │  (Paralelamente, el otro @Bean también construye su chain)
+                │
+                ├──────────────────────────┐
+                │                          │
+                ▼                          ▼
+┌──────────────────────────┐   ┌──────────────────────────┐
+│  SecurityFilterChain #1  │   │  SecurityFilterChain #2  │
+│  @Order(1)               │   │  @Order(2)               │
+│  /oauth2/**              │   │  /accounts, /loans, etc. │
+└──────────────┬───────────┘   └───────────┬──────────────┘
+               │                           │
+               └───────────┬───────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│  Spring Security registra ambos en FilterChainProxy                             │
+└───────────────┬─────────────────────────────────────────────────────────────────┘
+                │
+                ▼
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                      🌐 APLICACIÓN LISTA                                         │
+│  Esperando peticiones HTTP...                                                   │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+
+═══════════════════════════════════════════════════════════════════════════════════
+                         FLUJO DE PETICIÓN EN RUNTIME
+═══════════════════════════════════════════════════════════════════════════════════
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│  Petición HTTP: POST /oauth2/token                                              │
+└───────────────┬─────────────────────────────────────────────────────────────────┘
+                │
+                ▼
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│  FilterChainProxy recibe la petición                                            │
+└───────────────┬─────────────────────────────────────────────────────────────────┘
+                │
+                │  Itera sobre TODOS los SecurityFilterChain (ordenados por @Order)
+                │
+                ▼
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│  EVALÚA: SecurityFilterChain #1 (@Order(1))                                     │
+│  ═══════════════════════════════════════════════════════════════════════════    │
+│  Pregunta: ¿matches("/oauth2/token")?                                           │
+│  Respuesta: ✅ SÍ (porque RequestMatcher incluye /oauth2/**)                    │
+└───────────────┬─────────────────────────────────────────────────────────────────┘
+                │
+                ▼
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│  Ejecuta getFilters() de SecurityFilterChain #1                                 │
+│  ═══════════════════════════════════════════════════════════════════════════    │
+│  Ejecuta filtros en orden:                                                      │
+│  1. SecurityContextPersistenceFilter                                            │
+│  2. OAuth2TokenEndpointFilter           ← 🎯 ESTE PROCESA /oauth2/token        │
+│     ├─ Valida client_id y client_secret                                        │
+│     ├─ Genera Access Token (JWT)                                               │
+│     ├─ Genera ID Token (si OIDC está habilitado)                               │
+│     └─ Retorna JSON con tokens                                                 │
+│  3. (no llega a otros filtros, el anterior ya respondió)                        │
+└───────────────┬─────────────────────────────────────────────────────────────────┘
+                │
+                ▼
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│  Respuesta HTTP:                                                                │
+│  {                                                                              │
+│    "access_token": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...",                   │
+│    "id_token": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...",                       │
+│    "token_type": "Bearer",                                                      │
+│    "expires_in": 3600,                                                          │
+│    "scope": "openid read write"                                                 │
+│  }                                                                              │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+
+═══════════════════════════════════════════════════════════════════════════════════
+                    OTRA PETICIÓN: GET /accounts
+═══════════════════════════════════════════════════════════════════════════════════
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│  Petición HTTP: GET /accounts                                                   │
+│  Header: Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...          │
+└───────────────┬─────────────────────────────────────────────────────────────────┘
+                │
+                ▼
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│  EVALÚA: SecurityFilterChain #1 (@Order(1))                                     │
+│  Pregunta: ¿matches("/accounts")?                                               │
+│  Respuesta: ❌ NO (solo matchea /oauth2/** y /.well-known/**)                  │
+└───────────────┬─────────────────────────────────────────────────────────────────┘
+                │
+                ▼
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│  EVALÚA: SecurityFilterChain #2 (@Order(2))                                     │
+│  Pregunta: ¿matches("/accounts")?                                               │
+│  Respuesta: ✅ SÍ (matchea cualquier request)                                   │
+└───────────────┬─────────────────────────────────────────────────────────────────┘
+                │
+                ▼
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│  Ejecuta getFilters() de SecurityFilterChain #2                                 │
+│  ═══════════════════════════════════════════════════════════════════════════    │
+│  Ejecuta filtros en orden:                                                      │
+│  1. BearerTokenAuthenticationFilter                                             │
+│     ├─ Extrae token del header Authorization                                   │
+│     ├─ Descarga claves públicas de /oauth2/jwks                                │
+│     ├─ Valida firma del JWT                                                    │
+│     ├─ Valida expiración                                                       │
+│     └─ Crea Authentication con authorities                                     │
+│  2. AuthorizationFilter                                                         │
+│     ├─ Verifica si el usuario tiene permiso "read"                             │
+│     └─ ✅ Permite acceso si tiene el permiso                                    │
+│  3. Llega al controller AccountsController                                      │
+└───────────────┬─────────────────────────────────────────────────────────────────┘
+                │
+                ▼
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│  Respuesta HTTP:                                                                │
+│  [                                                                              │
+│    { "id": 1, "accountNumber": "123456", "balance": 5000 },                     │
+│    { "id": 2, "accountNumber": "789012", "balance": 10000 }                     │
+│  ]                                                                              │
+└─────────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### 🧩 Mapa Mental de Relaciones
+
+```
+                      SecurityFilterChain (Interface)
+                             │
+                             ├─── matches(HttpServletRequest): boolean
+                             └─── getFilters(): List<Filter>
+                                       │
+                  ┌────────────────────┴────────────────────┐
+                  │                                         │
+        implementada por                              contiene
+                  │                                         │
+                  ▼                                         ▼
+    DefaultSecurityFilterChain                      List<Filter>
+    (Clase concreta)                                      │
+         │                                                │
+         ├─── requestMatcher                              ├─── OAuth2TokenEndpointFilter
+         │    (¿Para qué rutas?)                          ├─── OAuth2AuthorizationEndpointFilter
+         │                                                ├─── OidcUserInfoEndpointFilter
+         └─── filters                                     ├─── BearerTokenAuthenticationFilter
+              (¿Qué filtros ejecutar?)                    └─── AuthorizationFilter
+                                                                    │
+                                                                    │ ejecutan
+                                                                    ▼
+                                                          Lógica de seguridad
+                                                          (autenticación,
+                                                           autorización,
+                                                           generación de tokens)
+
+
+HttpSecurity (Builder)
+    │
+    ├─── Configurado por: applyDefaultSecurity(http)
+    │    └─── Registra: OAuth2AuthorizationServerConfigurer
+    │         └─── Contiene métodos:
+    │              ├─── oidc()
+    │              ├─── tokenEndpoint()
+    │              └─── authorizationEndpoint()
+    │
+    ├─── Método: getConfigurer(Class)
+    │    └─── Retorna: Configurers ya registrados
+    │
+    └─── Método: build()
+         └─── Retorna: SecurityFilterChain (implementación concreta)
+
+
+Customizer<T> (Interface Funcional)
+    │
+    ├─── Método abstracto: customize(T t)
+    │
+    └─── Método estático: withDefaults()
+         └─── Retorna: (t) -> {}  (lambda vacía)
+         └─── Significado: "No personalizar, usar valores por defecto"
+```
+
+---
+
+### 📚 Guía de Referencia Rápida
+
+#### ¿Cuándo usar cada componente?
+
+| Quiero... | Uso... |
+|-----------|--------|
+| Configurar un servidor OAuth2 completo | `OAuth2AuthorizationServerConfiguration.applyDefaultSecurity(http)` |
+| Agregar información de usuario (OIDC) | `.oidc(Customizer.withDefaults())` |
+| Personalizar endpoints OAuth2 | `http.getConfigurer(OAuth2AuthorizationServerConfigurer.class).tokenEndpoint(...)` |
+| Usar configuración por defecto | `Customizer.withDefaults()` |
+| Personalizar configuración | `config -> config.algo(...)` |
+| Definir qué rutas maneja un filtro | Implementar `SecurityFilterChain.matches()` (lo hace `http.build()`) |
+| Ver qué filtros se ejecutan | `SecurityFilterChain.getFilters()` o logs con `logging.level.org.springframework.security=TRACE` |
+
+---
+
+### 🎯 Puntos Clave para Recordar
+
+1. **`SecurityFilterChain` es una INTERFACE**, no una clase
+2. **`http.build()` crea una implementación** de esa interface
+3. **`applyDefaultSecurity()` registra un Configurer** que luego puedes personalizar
+4. **`getConfigurer()` NO crea un nuevo configurer**, retorna uno ya registrado
+5. **Cada método `@Bean` recibe su propia instancia de `HttpSecurity`**
+6. **`@Order` determina qué chain se evalúa primero**
+7. **Solo UN SecurityFilterChain procesa cada petición** (el primero que haga `matches(request) == true`)
+8. **`Customizer.withDefaults()` = lambda vacía** = usar valores por defecto
 
 ---
 
