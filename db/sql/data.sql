@@ -1,8 +1,8 @@
 insert into customers (email, pwd)
-values ('account@debuggeandoieas.com', 'to_be_encoded'),
-       ('cards@debuggeandoieas.com', 'to_be_encoded'),
-       ('loans@debuggeandoieas.com', 'to_be_encoded'),
-       ('balance@debuggeandoieas.com', 'to_be_encoded');
+values ('account@debuggeandoieas.com', '$2a$10$ilrQR0yy4oUfDp0cQFpiwO8Cq78Wk0NtvTIB4TsLcVEFYWQHnHk7G'),
+       ('cards@debuggeandoieas.com', '$2a$10$ilrQR0yy4oUfDp0cQFpiwO8Cq78Wk0NtvTIB4TsLcVEFYWQHnHk7G'),
+       ('loans@debuggeandoieas.com', '$2a$10$ilrQR0yy4oUfDp0cQFpiwO8Cq78Wk0NtvTIB4TsLcVEFYWQHnHk7G'),
+       ('balance@debuggeandoieas.com', '$2a$10$ilrQR0yy4oUfDp0cQFpiwO8Cq78Wk0NtvTIB4TsLcVEFYWQHnHk7G');
 
 insert into roles(role_name, description, id_customer)
 values ('ROLE_ADMIN', 'cant view account endpoint', 1),
@@ -20,7 +20,7 @@ insert into partners(client_id,
                      redirect_uri_logout)
 values ('debuggeandoideas',
         'debuggeando ideas',
-        'secret',
+        '$2a$10$p3XsR8MRzgI4Z08J68x.0u.VGC1HUGLLlwr6jAU.AjKXspY1gHNQe',
         'read,write',
         'authorization_code,refresh_token',
         'client_secret_basic,client_secret_jwt',

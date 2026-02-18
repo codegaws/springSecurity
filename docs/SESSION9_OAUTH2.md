@@ -4172,11 +4172,684 @@ Para completar la configuración OAuth2, necesitas:
 
 ---
 
-## 📝 Clase 76  - 👤🕵️‍♂🕵️‍♂🔑 🔑
+## 📝 Clase 76 - userSecurityFilterChain 👤🕵️‍♂️🕵️‍♂️🔑🔑
+
+### 🎯 Contexto del Filter Chain #3
+
+Ya tienes configurados dos `SecurityFilterChain`:
+- **@Order(1)**: `oauth2SecurityFilterChain` → Servidor de Autorización OAuth2
+- **@Order(2)**: `clientSecurityFilterChain` → Servidor de Recursos con JWT
+
+Ahora veremos el **tercer filtro** que agrega **autorización basada en roles tradicionales** de Spring Security.
+
+---
+
+### 📄 Código Completo
+
+```java
+@Bean
+@Order(3)  // 👈 Tercera prioridad - Se evalúa DESPUÉS de @Order(1) y @Order(2)
+SecurityFilterChain userSecurityFilterChain(HttpSecurity http) throws Exception {
+    http.authorizeHttpRequests(auth ->
+            auth.requestMatchers(ADMIN_RESOURCES).hasRole(ROLE_ADMIN)
+                    .requestMatchers(USER_RESOURCES).hasRole(ROLE_USER)
+                    .anyRequest().permitAll());
+    return http.build();
+}
+```
+
+**📌 Constantes usadas:**
+```java
+private static final String[] USER_RESOURCES = {"/loans/**", "/balance/**"};
+private static final String[] ADMIN_RESOURCES = {"/accounts/**", "/cards/**"};
+private static final String ROLE_ADMIN = "ADMIN";
+private static final String ROLE_USER = "USER";
+```
+
+---
+
+### 🧩 Desglose del Método
+
+#### 🏷️ 1. `@Bean`
+
+```
+🎁 Anotación @Bean
+└─ Le dice a Spring: "Registra este SecurityFilterChain en el contexto de aplicación"
+   └─ Spring lo gestiona como un componente
+   └─ Disponible para inyección de dependencias
+```
+
+**🔍 ¿Por qué necesitas un @Bean?**
+- Spring Security busca **todos** los beans de tipo `SecurityFilterChain`
+- Los combina en orden de prioridad para crear la cadena de filtros completa
+
+---
+
+#### 🔢 2. `@Order(3)`
+
+### 📊 Tabla de Prioridades
+
+| Orden | Filter Chain | Responsabilidad | Tipo de Autenticación |
+|-------|--------------|-----------------|----------------------|
+| **@Order(1)** | `oauth2SecurityFilterChain` | 🎫 Generar tokens OAuth2 | Client Credentials |
+| **@Order(2)** | `clientSecurityFilterChain` | 🔐 Validar JWT Bearer tokens | JWT Token |
+| **@Order(3)** | `userSecurityFilterChain` | 👤 Autorización por roles | Form Login / Basic Auth |
+
+---
+
+### 🔄 Flujo de Evaluación Completo
+
+```
+┌────────────────────────────────────────────────────────────────┐
+│               📨 HTTP Request Llegando                         │
+│         GET /accounts HTTP/1.1                                 │
+│         Authorization: Bearer eyJhbGc...                       │
+└──────────────────────────┬─────────────────────────────────────┘
+                           │
+                           ▼
+┌──────────────────────────────────────────────────────────────┐
+│  🔍 Spring Security Filter Chain Manager                      │
+│  "Evaluaré cada SecurityFilterChain por orden de @Order"     │
+└──────────────────────────┬───────────────────────────────────┘
+                           │
+          ┌────────────────┼────────────────┐
+          │                │                │
+          ▼                ▼                ▼
+┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐
+│   @Order(1)     │  │   @Order(2)     │  │   @Order(3)     │
+│ OAuth2 Server   │  │ Resource Server │  │ User Roles      │
+├─────────────────┤  ├─────────────────┤  ├─────────────────┤
+│ Matches:        │  │ Matches:        │  │ Matches:        │
+│ /oauth2/**      │  │ /accounts/**    │  │ /accounts/**    │
+│ /login          │  │ /loans/**       │  │ /loans/**       │
+│                 │  │ /balance/**     │  │ /balance/**     │
+│                 │  │ /cards/**       │  │ /cards/**       │
+└────────┬────────┘  └────────┬────────┘  └────────┬────────┘
+         │                    │                    │
+         ❌ NO Match          ❌ NO Match          ✅ MATCH!
+         │                    │                    │
+         │                    │                    ▼
+         │                    │          ┌──────────────────┐
+         │                    │          │ Verifica Roles:  │
+         │                    │          │ ¿Tiene ADMIN?    │
+         │                    │          └────────┬─────────┘
+         │                    │                   │
+         │                    │                   ▼
+         │                    │          ┌──────────────────┐
+         │                    │          │ ✅ SÍ → Permitir│
+         │                    │          │ ❌ NO → 403     │
+         │                    │          └──────────────────┘
+```
+
+---
+
+#### 3️⃣ `http.authorizeHttpRequests()`
+
+### 🛡️ ¿Qué hace este método?
+
+Define **reglas de autorización** basadas en las URLs (endpoints) que el usuario intenta acceder.
+
+```java
+http.authorizeHttpRequests(auth -> 
+    // Configuración de reglas aquí
+)
+```
+
+**🔑 Concepto clave:** 
+- **Autenticación**: ¿Quién eres? (username/password, token)
+- **Autorización**: ¿Qué puedes hacer? (roles, permisos)
+
+---
+
+#### 4️⃣ `auth.requestMatchers(ADMIN_RESOURCES).hasRole(ROLE_ADMIN)`
+
+### 📝 Desglose paso a paso
+
+```java
+auth.requestMatchers(ADMIN_RESOURCES)  // 1️⃣ ¿Qué URLs?
+    .hasRole(ROLE_ADMIN)               // 2️⃣ ¿Qué rol necesita?
+```
+
+#### 🔍 1. `requestMatchers(ADMIN_RESOURCES)`
+
+**Define qué rutas aplican:**
+```java
+ADMIN_RESOURCES = {"/accounts/**", "/cards/**"}
+```
+
+**El patrón `/**` significa:**
+```
+/accounts/**  →  Coincide con:
+                 ✅ /accounts
+                 ✅ /accounts/
+                 ✅ /accounts/123
+                 ✅ /accounts/123/details
+                 ✅ /accounts/user/george/balance
+```
+
+#### 🎭 2. `.hasRole(ROLE_ADMIN)`
+
+**Requiere que el usuario tenga el rol `ADMIN`**
+
+### ⚠️ Diferencia CRÍTICA entre `hasRole()` y `hasAuthority()`
+
+| Método | Spring Internamente busca | Ejemplo |
+|--------|---------------------------|---------|
+| **`.hasRole("ADMIN")`** | `ROLE_ADMIN` | Spring **AGREGA** el prefijo `ROLE_` automáticamente |
+| **`.hasAuthority("ROLE_ADMIN")`** | `ROLE_ADMIN` | Busca **EXACTAMENTE** lo que escribiste |
+
+#### 🧪 Ejemplo Práctico
+
+**En tu base de datos tienes:**
+```sql
+INSERT INTO roles (name) VALUES ('ROLE_ADMIN');
+```
+
+**En tu código usas:**
+```java
+.hasRole("ADMIN")  // ✅ Correcto - Spring busca "ROLE_ADMIN"
+```
+
+**❌ Error común:**
+```java
+.hasRole("ROLE_ADMIN")  // ❌ MAL - Spring buscaría "ROLE_ROLE_ADMIN"
+```
+
+---
+
+#### 5️⃣ `auth.requestMatchers(USER_RESOURCES).hasRole(ROLE_USER)`
+
+Similar al anterior pero para usuarios regulares:
+
+```java
+USER_RESOURCES = {"/loans/**", "/balance/**"}
+ROLE_USER = "USER"
+```
+
+**Traducción:**
+> "Cualquier petición a `/loans/**` o `/balance/**` requiere que el usuario tenga el rol `USER`"
+
+---
+
+#### 6️⃣ `.anyRequest().permitAll()`
+
+### 🚪 Puerta abierta para el resto
+
+```java
+.anyRequest().permitAll()
+```
+
+**📖 Significado:**
+> "Todas las demás peticiones que NO coincidan con las reglas anteriores, permítelas sin autenticación"
+
+#### 🌐 Ejemplos de rutas permitidas:
+
+```
+✅ /                  → Página principal
+✅ /welcome           → Página de bienvenida
+✅ /public/about      → Página "Acerca de"
+✅ /health            → Health check
+✅ /favicon.ico       → Icono del sitio
+```
+
+**🔒 Rutas protegidas:**
+```
+🔐 /accounts/**  → Requiere ROLE_ADMIN
+🔐 /cards/**     → Requiere ROLE_ADMIN
+🔐 /loans/**     → Requiere ROLE_USER
+🔐 /balance/**   → Requiere ROLE_USER
+```
+
+---
+
+### 📊 Tabla Comparativa: Tres Filter Chains
+
+| Característica | @Order(1) | @Order(2) | @Order(3) |
+|----------------|-----------|-----------|-----------|
+| **🎯 Nombre** | `oauth2SecurityFilterChain` | `clientSecurityFilterChain` | `userSecurityFilterChain` |
+| **🛡️ Tipo Seguridad** | OAuth2 Authorization Server | OAuth2 Resource Server | Role-Based Access Control (RBAC) |
+| **🔐 Autenticación** | Client Credentials | JWT Bearer Token | Form/Basic Auth |
+| **📝 Autorización** | N/A (genera tokens) | Authorities (`write`, `read`) | Roles (`ADMIN`, `USER`) |
+| **🎫 Qué valida** | Credenciales del cliente | Firma JWT + Scopes | Roles del usuario |
+| **🛣️ Rutas** | `/oauth2/**`, `/login` | Todas las rutas | Todas las rutas |
+| **💡 Uso Principal** | Generar tokens | Validar tokens en APIs | Control de acceso tradicional |
+
+---
+
+### 🔄 Escenario Real: Petición a `/accounts`
+
+#### 🧪 Caso 1: Sin Autenticación
+
+```bash
+GET /accounts HTTP/1.1
+Host: localhost:8080
+```
+
+**📝 Flujo:**
+```
+1. @Order(1) → ❌ No coincide con /oauth2/** → Pasa al siguiente
+2. @Order(2) → ✅ Coincide con /accounts/**
+   ├─ Verifica header Authorization
+   ├─ ❌ No hay token Bearer
+   └─ 🚫 Respuesta: 401 Unauthorized
+```
+
+---
+
+#### 🧪 Caso 2: Con Token JWT válido pero sin rol ADMIN
+
+```bash
+GET /accounts HTTP/1.1
+Authorization: Bearer eyJhbGc...
+```
+
+**Token contiene:**
+```json
+{
+  "sub": "user@example.com",
+  "ROLES": "[ROLE_USER]"  // ← Solo rol USER
+}
+```
+
+**📝 Flujo:**
+```
+1. @Order(1) → ❌ No coincide → Pasa
+2. @Order(2) → ✅ Coincide
+   ├─ Token válido ✅
+   ├─ Verifica authority "write"
+   ├─ /accounts/** requiere "write"
+   ├─ Token tiene scope "read" pero NO "write"
+   └─ 🚫 Respuesta: 403 Forbidden
+   
+3. @Order(3) → ✅ Coincide (se evalúa también)
+   ├─ Verifica hasRole("ADMIN")
+   ├─ Usuario tiene ROLE_USER (no ROLE_ADMIN)
+   └─ 🚫 Respuesta: 403 Forbidden
+```
+
+---
+
+#### 🧪 Caso 3: Con Token JWT válido + rol ADMIN
+
+```bash
+GET /accounts HTTP/1.1
+Authorization: Bearer eyJhbGc...
+```
+
+**Token contiene:**
+```json
+{
+  "sub": "admin@example.com",
+  "ROLES": "[ROLE_ADMIN, ROLE_USER]"
+}
+```
+
+**📝 Flujo:**
+```
+1. @Order(1) → ❌ No coincide → Pasa
+2. @Order(2) → ✅ Coincide
+   ├─ Token válido ✅
+   ├─ Tiene authority "write" ✅
+   └─ ✅ PERMITIDO
+   
+3. @Order(3) → (Ya no se evalúa, la petición ya fue procesada)
+```
+
+---
+
+### 🤔 ¿Por qué tener 3 Filter Chains?
+
+#### 💡 Separación de Responsabilidades
+
+```
+┌─────────────────────────────────────────────────────────┐
+│             🏢 Arquitectura de tu Aplicación             │
+├─────────────────────────────────────────────────────────┤
+│                                                          │
+│  📦 @Order(1): oauth2SecurityFilterChain                 │
+│  ├─ Propósito: Servidor de Autorización                 │
+│  ├─ Genera: Tokens JWT                                  │
+│  └─ Clientes: Aplicaciones externas                     │
+│                                                          │
+│  📦 @Order(2): clientSecurityFilterChain                 │
+│  ├─ Propósito: API REST protegida                       │
+│  ├─ Valida: Tokens JWT                                  │
+│  └─ Clientes: Apps con tokens                           │
+│                                                          │
+│  📦 @Order(3): userSecurityFilterChain                   │
+│  ├─ Propósito: Autorización granular                    │
+│  ├─ Valida: Roles específicos                           │
+│  └─ Clientes: Usuarios finales                          │
+│                                                          │
+└─────────────────────────────────────────────────────────┘
+```
+
+---
+
+### ⚙️ Configuración Completa del SecurityConfig
+
+```java
+@Configuration
+public class SecurityConfig {
+    
+    // 🎫 Filter Chain #1: Authorization Server
+    @Bean
+    @Order(1)
+    SecurityFilterChain oauth2SecurityFilterChain(HttpSecurity http) throws Exception {
+        OAuth2AuthorizationServerConfiguration.applyDefaultSecurity(http);
+        http.getConfigurer(OAuth2AuthorizationServerConfigurer.class)
+                .oidc(Customizer.withDefaults());
+        http.exceptionHandling(e ->
+                e.authenticationEntryPoint(new LoginUrlAuthenticationEntryPoint(LOGIN_RESOURCE)));
+        return http.build();
+    }
+    
+    // 🔐 Filter Chain #2: Resource Server (JWT)
+    @Bean
+    @Order(2)
+    SecurityFilterChain clientSecurityFilterChain(HttpSecurity http) throws Exception {
+        http.formLogin(Customizer.withDefaults());
+        http.authorizeHttpRequests(auth ->
+                auth.requestMatchers(ADMIN_RESOURCES).hasAuthority(AUTH_WRITE)
+                        .requestMatchers(USER_RESOURCES).hasAuthority(AUTH_READ)
+                        .anyRequest().permitAll());
+        http.oauth2ResourceServer(oauth ->
+                oauth.jwt(Customizer.withDefaults()));
+        return http.build();
+    }
+    
+    // 👤 Filter Chain #3: Traditional Roles
+    @Bean
+    @Order(3)
+    SecurityFilterChain userSecurityFilterChain(HttpSecurity http) throws Exception {
+        http.authorizeHttpRequests(auth ->
+                auth.requestMatchers(ADMIN_RESOURCES).hasRole(ROLE_ADMIN)
+                        .requestMatchers(USER_RESOURCES).hasRole(ROLE_USER)
+                        .anyRequest().permitAll());
+        return http.build();
+    }
+    
+    // 📌 Constantes
+    private static final String[] USER_RESOURCES = {"/loans/**", "/balance/**"};
+    private static final String[] ADMIN_RESOURCES = {"/accounts/**", "/cards/**"};
+    private static final String AUTH_WRITE = "write";
+    private static final String AUTH_READ = "read";
+    private static final String ROLE_ADMIN = "ADMIN";
+    private static final String ROLE_USER = "USER";
+    private static final String LOGIN_RESOURCE = "/login";
+}
+```
+
+---
+
+### 🆚 Diferencias Clave: @Order(2) vs @Order(3)
+
+#### 📊 Tabla Comparativa
+
+| Aspecto | @Order(2) - Resource Server | @Order(3) - Role-Based |
+|---------|----------------------------|------------------------|
+| **🎯 Tipo de Autorización** | Authority-based (`write`, `read`) | Role-based (`ADMIN`, `USER`) |
+| **🔑 Qué valida** | Scopes en el JWT | Roles en la BD |
+| **📝 Método** | `.hasAuthority("write")` | `.hasRole("ADMIN")` |
+| **🏷️ Prefijo** | NO agrega prefijo | Agrega `ROLE_` automáticamente |
+| **🎫 Fuente de datos** | Claims del JWT | UserDetails de BD |
+| **💼 Caso de uso** | APIs públicas con OAuth2 | Aplicaciones internas |
+
+#### 🧩 Ejemplo Comparativo
+
+**Mismo endpoint, diferente validación:**
+
+```java
+// @Order(2) - Valida authorities en el token
+auth.requestMatchers("/accounts/**").hasAuthority("write")
+// Busca en el JWT:
+// { "scope": "write read" }
+
+// @Order(3) - Valida roles en la BD
+auth.requestMatchers("/accounts/**").hasRole("ADMIN")
+// Busca en UserDetails:
+// authorities = [ROLE_ADMIN, ROLE_USER]
+```
+
+---
+
+### ⚠️ Problemas Comunes
+
+#### 1️⃣ Conflicto de Rutas
+
+```java
+// ❌ PROBLEMA: Ambos filtros manejan /accounts/**
+@Order(2)
+auth.requestMatchers("/accounts/**").hasAuthority("write")
+
+@Order(3)
+auth.requestMatchers("/accounts/**").hasRole("ADMIN")
+```
+
+**🔧 Solución:**
+```java
+// ✅ Opción 1: Usar rutas diferentes
+@Order(2)
+auth.requestMatchers("/api/accounts/**").hasAuthority("write")
+
+@Order(3)
+auth.requestMatchers("/admin/accounts/**").hasRole("ADMIN")
+
+// ✅ Opción 2: Combinar condiciones en un solo filtro
+auth.requestMatchers("/accounts/**")
+    .access("hasAuthority('write') or hasRole('ADMIN')")
+```
+
+---
+
+#### 2️⃣ Error con prefijo `ROLE_`
+
+```java
+// ❌ En la BD tienes: ROLE_ADMIN
+// ❌ En el código usas:
+.hasRole("ROLE_ADMIN")  // Busca ROLE_ROLE_ADMIN ❌
+
+// ✅ Correcto:
+.hasRole("ADMIN")  // Busca ROLE_ADMIN ✅
+```
+
+---
+
+#### 3️⃣ Orden de reglas
+
+```java
+// ❌ MAL: anyRequest() bloquea las reglas siguientes
+auth.anyRequest().permitAll()
+    .requestMatchers("/accounts/**").hasRole("ADMIN")  // Nunca se evalúa
+
+// ✅ BIEN: Específicas primero, genéricas al final
+auth.requestMatchers("/accounts/**").hasRole("ADMIN")
+    .requestMatchers("/loans/**").hasRole("USER")
+    .anyRequest().permitAll()  // Al final
+```
+
+---
+
+### 🎓 Resumen Ejecutivo
+
+#### ✅ `userSecurityFilterChain` en 3 puntos:
+
+1. **🔢 @Order(3)**: Se evalúa después de los filtros OAuth2
+2. **👤 Autorización por Roles**: Usa `.hasRole()` para validar roles tradicionales
+3. **🚪 Acceso Flexible**: Combina rutas protegidas con `.anyRequest().permitAll()`
+
+#### 📦 ¿Cuándo usar este filtro?
+
+```
+✅ Usar @Order(3) cuando:
+├─ Tienes usuarios internos con roles fijos
+├─ No necesitas OAuth2 para ciertas rutas
+├─ Quieres separar lógica de autorización
+└─ Necesitas fallback después de validar JWT
+
+❌ NO usar @Order(3) cuando:
+├─ Solo usas OAuth2 (suficiente con @Order(2))
+├─ No tienes roles definidos en la BD
+└─ Todas las rutas requieren JWT
+```
+
+---
+
+### 🔗 Relación con tus Entidades
+
+#### 📂 Modelo de Datos
+
+```java
+@Entity
+public class CustomerEntity {
+    @Id
+    private Long id;
+    private String email;
+    private String password;
+    
+    @ManyToMany(fetch = FetchType.EAGER)
+    private Set<RoleEntity> roles;  // ← hasRole() valida esto
+}
+
+@Entity
+public class RoleEntity {
+    @Id
+    private Long id;
+    private String name;  // ← Valores: "ROLE_ADMIN", "ROLE_USER"
+}
+```
+
+#### 🔄 Flujo de Carga de Roles
+
+```
+1. Usuario hace login
+   ↓
+2. JwtUserDetailService.loadUserByUsername()
+   ↓
+3. Carga CustomerEntity con sus roles desde BD
+   ↓
+4. Convierte roles a SimpleGrantedAuthority
+   ↓
+5. Spring Security verifica .hasRole("ADMIN")
+   ↓
+6. Busca "ROLE_ADMIN" en las authorities
+   ↓
+7. ✅ Permitido o ❌ 403 Forbidden
+```
+
+---
+
+### 🚀 Mejores Prácticas
+
+#### 1️⃣ Usa constantes
+
+```java
+// ✅ BIEN
+private static final String ROLE_ADMIN = "ADMIN";
+auth.requestMatchers("/accounts/**").hasRole(ROLE_ADMIN)
+
+// ❌ MAL: Strings hardcodeados
+auth.requestMatchers("/accounts/**").hasRole("ADMIN")
+```
+
+---
+
+#### 2️⃣ Documenta cada filtro
+
+```java
+/**
+ * 👤 Filter Chain para autorización basada en roles
+ * 
+ * Propósito: Controlar acceso según roles de usuario
+ * Orden: @Order(3) - Última prioridad
+ * Autenticación: Form login o Basic Auth
+ * 
+ * Rutas protegidas:
+ * - /accounts/**, /cards/** → ROLE_ADMIN
+ * - /loans/**, /balance/** → ROLE_USER
+ */
+@Bean
+@Order(3)
+SecurityFilterChain userSecurityFilterChain(HttpSecurity http) { ... }
+```
+
+---
+
+#### 3️⃣ Agrupa rutas relacionadas
+
+```java
+// ✅ BIEN: Arrays de constantes
+private static final String[] ADMIN_RESOURCES = {
+    "/accounts/**", 
+    "/cards/**",
+    "/admin/**"
+};
+
+// ❌ MAL: Repetir .requestMatchers()
+auth.requestMatchers("/accounts/**").hasRole("ADMIN")
+    .requestMatchers("/cards/**").hasRole("ADMIN")
+    .requestMatchers("/admin/**").hasRole("ADMIN")
+```
+
+---
+
+### 🎯 Próximos Pasos
+
+Para completar tu configuración de seguridad:
+
+1. ✅ Implementar `UserDetailsService` (ya lo tienes con `JwtUserDetailService`)
+2. ✅ Configurar `PasswordEncoder` (BCryptPasswordEncoder)
+3. ⏳ Agregar manejo de excepciones personalizado
+4. ⏳ Implementar refresh tokens
+5. ⏳ Configurar CORS si tienes frontend separado
+
+---
+
+### 📚 Referencias
+
+- [Spring Security Authorization](https://docs.spring.io/spring-security/reference/servlet/authorization/authorize-http-requests.html)
+- [hasRole vs hasAuthority](https://www.baeldung.com/spring-security-granted-authority-vs-role)
+- [Multiple SecurityFilterChain](https://spring.io/blog/2022/02/21/spring-security-without-the-websecurityconfigureradapter)
+
+---
+
+> 💡 **Conclusión**: El `@Order(3) userSecurityFilterChain` proporciona una capa adicional de seguridad basada en roles tradicionales de Spring Security, complementando las validaciones OAuth2 de los filtros anteriores. Es útil para tener control granular sobre recursos específicos sin depender exclusivamente de tokens JWT.
 
 ---
 
 ## 📝 Clase 77  - 👤🕵️‍♂🕵️‍♂🔑 🔑
+
+- Se hace esto para generar contraseñas codificadas con BCrypt y no tener que usar texto plano en la base de datos.
+- Al ejecutar la aplicación, se imprimen en consola las contraseñas codificadas para el usuario y el cliente, que luego puedes copiar y pegar en tu base de datos.
+
+```java
+
+
+@SpringBootApplication
+public class SpringSecurityApplication implements CommandLineRunner {
+
+    @Autowired
+    PasswordEncoder passwordEncoder;
+
+    public static void main(String[] args) {
+        SpringApplication.run(SpringSecurityApplication.class, args);
+    }
+
+    @Override
+    public void run(String... args) throws Exception {
+        System.out.println("user:" + this.passwordEncoder.encode("to_be_encoded"));
+        System.out.println("client:" + this.passwordEncoder.encode("secret"));
+    }
+}
+
+```
+#### Resultado en consola:
+
+user:$2a$10$ilrQR0yy4oUfDp0cQFpiwO8Cq78Wk0NtvTIB4TsLcVEFYWQHnHk7G
+client:$2a$10$p3XsR8MRzgI4Z08J68x.0u.VGC1HUGLLlwr6jAU.AjKXspY1gHNQe
+
+- Bajamos la BD y actualizamos las contraseñas con los valores codificados.
+- Levantamos con docker compose up -d y probamos el login con postman usando el client_id y client_secret definidos en la BD.
 
 ---
 
