@@ -16,9 +16,9 @@ AuthorizationServerSettings authorizationServerSettings() {
     return AuthorizationServerSettings.builder().build();
 }
 ```
-# 🔐 AuthenticationProvider y AuthorizationServerSettings
+### 🔐 AuthenticationProvider y AuthorizationServerSettings
 
-## 📑 Índice
+### 📑 Índice
 - [🔍 AuthenticationProvider](#-authenticationprovider)
     - [🎯 ¿Qué es un AuthenticationProvider?](#-qué-es-un-authenticationprovider)
     - [🏗️ Configuración del DaoAuthenticationProvider](#️-configuración-del-dauthenticationprovider)
@@ -32,9 +32,9 @@ AuthorizationServerSettings authorizationServerSettings() {
 
 ---
 
-## 🔍 AuthenticationProvider
+### 🔍 AuthenticationProvider
 
-### 🎯 ¿Qué es un AuthenticationProvider?
+#### 🎯 ¿Qué es un AuthenticationProvider?
 
 ```java
 @Bean
@@ -337,7 +337,7 @@ Spring intentará autenticar con cada proveedor en orden hasta que uno tenga éx
 
 ---
 
-## ⚙️ AuthorizationServerSettings
+### ⚙️ AuthorizationServerSettings
 
 ### 🎯 ¿Qué es AuthorizationServerSettings?
 
@@ -600,7 +600,7 @@ AuthorizationServerSettings authorizationServerSettings() {
 
 ---
 
-## 🎓 Resumen Final
+### 🎓 Resumen Final
 
 ### 🛡️ AuthenticationProvider
 
@@ -667,7 +667,858 @@ AuthorizationServerSettings authorizationServerSettings() {
 
 ---
 
-## 📝 Clase 79  - 👤🕵️‍♂🕵️‍♂🔑 🔑
+## 📝 Clase 79  - CONFIGURANDO JWT 👤🕵️‍♂🕵️‍♂🔑 🔑
+
+```java
+
+
+```
+### 🔄 JWT Converters: Transformación de Tokens a Autoridades
+
+### 📑 Índice
+- [🎯 Introducción al Problema](#-introducción-al-problema)
+- [🔧 JwtGrantedAuthoritiesConverter](#-jwtgrantedauthoritiesconverter)
+  - [🎯 ¿Qué es JwtGrantedAuthoritiesConverter?](#-qué-es-jwtgrantedauthoritiesconverter)
+  - [🔍 Análisis Línea por Línea](#-análisis-línea-por-línea)
+  - [📊 Comportamiento Por Defecto vs Personalizado](#-comportamiento-por-defecto-vs-personalizado)
+  - [💡 Ejemplo Práctico con tu JWT](#-ejemplo-práctico-con-tu-jwt)
+- [🔀 JwtAuthenticationConverter](#-jwtauthenticationconverter)
+  - [🎯 ¿Qué es JwtAuthenticationConverter?](#-qué-es-jwtauthenticationconverter)
+  - [🔗 Relación entre los Dos Converters](#-relación-entre-los-dos-converters)
+  - [🔄 Flujo Completo de Conversión](#-flujo-completo-de-conversión)
+- [🎬 Flujo Completo: Del Token JWT al Usuario Autenticado](#-flujo-completo-del-token-jwt-al-usuario-autenticado)
+- [🧪 Casos de Uso Prácticos](#-casos-de-uso-prácticos)
+- [🎓 Resumen y Mejores Prácticas](#-resumen-y-mejores-prácticas)
+
+---
+
+### 🎯 Introducción al Problema
+
+### ❓ ¿Por qué necesitamos estos Converters?
+
+Cuando un usuario envía un **JWT Token** para acceder a recursos protegidos, Spring Security necesita:
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│  🎫 JWT Token (String)                                        │
+│  "eyJhbGciOiJIUzI1NiJ9.eyJST0xFUyI6IltWSUVXX0FDQ09VTlRdIn0..." │
+└──────────────────────────────────────────────────────────────┘
+                        ⬇️  ❓ ¿Cómo convertir?
+┌──────────────────────────────────────────────────────────────┐
+│  👤 Usuario Autenticado (Authentication)                      │
+│  ├─ Username: account@debuggeandoieas.com                    │
+│  ├─ Authorities: [VIEW_ACCOUNT]                              │
+│  └─ Authenticated: true                                      │
+└──────────────────────────────────────────────────────────────┘
+```
+
+**Problema:** JWT es solo un **string codificado**, necesitamos extraer:
+1. 👤 **Subject** (usuario)
+2. 🔑 **Claims** (información adicional)
+3. 🛡️ **Authorities** (roles/permisos)
+
+**Solución:** Los **Converters** transforman el JWT en objetos que Spring Security entiende.
+
+---
+
+### 🔧 JwtGrantedAuthoritiesConverter
+
+### 🎯 ¿Qué es JwtGrantedAuthoritiesConverter?
+
+```java
+@Bean
+JwtGrantedAuthoritiesConverter jwtGrantedAuthoritiesConverter() {
+    var converter = new JwtGrantedAuthoritiesConverter();
+    converter.setAuthorityPrefix("");
+    return converter;
+}
+```
+
+**`JwtGrantedAuthoritiesConverter`** es un componente que **extrae los roles/permisos** del JWT y los convierte en `GrantedAuthority` (objetos que Spring Security usa para controlar acceso).
+
+#### 🏭 Analogía del Mundo Real
+
+Imagina una **fábrica que procesa credenciales**:
+
+```
+🏭 Fábrica de Autoridades (JwtGrantedAuthoritiesConverter)
+
+📥 ENTRADA (JWT Claim):
+   {
+       "scope": "read write",
+       "ROLES": "[VIEW_ACCOUNT]"
+   }
+
+🔄 PROCESAMIENTO:
+   1. Lee el claim "scope"
+   2. Separa por espacios: ["read", "write"]
+   3. Agrega prefijo: "SCOPE_read", "SCOPE_write"
+   4. Convierte a SimpleGrantedAuthority
+
+📤 SALIDA (Authorities):
+   [
+       SimpleGrantedAuthority("SCOPE_read"),
+       SimpleGrantedAuthority("SCOPE_write")
+   ]
+```
+
+---
+
+### 🔍 Análisis Línea por Línea
+
+#### 1️⃣ Crear la Instancia
+
+```java
+var converter = new JwtGrantedAuthoritiesConverter();
+```
+
+| Aspecto | Descripción |
+|---------|-------------|
+| **Clase** | `JwtGrantedAuthoritiesConverter` |
+| **Package** | `org.springframework.security.oauth2.server.resource.authentication` |
+| **Propósito** | Extraer autoridades del JWT |
+| **Configuración por defecto** | Lee el claim `scope` y agrega prefijo `SCOPE_` |
+
+---
+
+#### 2️⃣ Configurar el Prefijo
+
+```java
+converter.setAuthorityPrefix("");
+```
+
+**🎯 Esta es la línea MÁS IMPORTANTE del método**
+
+| Configuración | Valor | Resultado |
+|---------------|-------|-----------|
+| **Por defecto** | `"SCOPE_"` | `SCOPE_read`, `SCOPE_write` |
+| **Tu configuración** | `""` (vacío) | `read`, `write` |
+
+#### ⚠️ ¿Por qué cambiar el prefijo?
+
+**Comportamiento por defecto de Spring:**
+
+```java
+// JWT Claim:
+{
+    "scope": "read write"
+}
+
+// ❌ CON PREFIJO (por defecto):
+// Spring genera: ["SCOPE_read", "SCOPE_write"]
+
+// Tu código de seguridad:
+.hasAuthority("read")  // ❌ FALLA porque busca "read" pero tiene "SCOPE_read"
+```
+
+**Comportamiento con prefijo vacío:**
+
+```java
+// JWT Claim:
+{
+    "scope": "read write"
+}
+
+// ✅ SIN PREFIJO (tu configuración):
+// Spring genera: ["read", "write"]
+
+// Tu código de seguridad:
+.hasAuthority("read")  // ✅ FUNCIONA porque coincide exactamente
+```
+
+---
+
+### 📊 Comportamiento Por Defecto vs Personalizado
+
+#### 🔴 Escenario 1: Sin Configuración Personalizada
+
+```java
+// ❌ SIN el bean JwtGrantedAuthoritiesConverter
+// Spring usa configuración por defecto
+
+// JWT Token decodificado:
+{
+    "sub": "account@debuggeandoieas.com",
+    "scope": "read write",
+    "ROLES": "[VIEW_ACCOUNT]",
+    "iat": 1770604371,
+    "exp": 1770622371
+}
+
+// Authorities generadas automáticamente:
+[
+    SimpleGrantedAuthority("SCOPE_read"),     // ⬅️ Prefijo "SCOPE_" agregado
+    SimpleGrantedAuthority("SCOPE_write")     // ⬅️ Prefijo "SCOPE_" agregado
+]
+
+// Tu SecurityConfig:
+http.authorizeHttpRequests(auth ->
+    auth.requestMatchers(ADMIN_RESOURCES).hasAuthority("write")  // ❌ FALLA
+        .requestMatchers(USER_RESOURCES).hasAuthority("read"));  // ❌ FALLA
+
+// ⚠️ Problema: Busca "write" pero tiene "SCOPE_write"
+```
+
+---
+
+#### 🟢 Escenario 2: Con tu Configuración Personalizada
+
+```java
+// ✅ CON el bean JwtGrantedAuthoritiesConverter
+@Bean
+JwtGrantedAuthoritiesConverter jwtGrantedAuthoritiesConverter() {
+    var converter = new JwtGrantedAuthoritiesConverter();
+    converter.setAuthorityPrefix("");  // ⬅️ Elimina el prefijo
+    return converter;
+}
+
+// JWT Token decodificado (mismo):
+{
+    "sub": "account@debuggeandoieas.com",
+    "scope": "read write",
+    "ROLES": "[VIEW_ACCOUNT]",
+    "iat": 1770604371,
+    "exp": 1770622371
+}
+
+// Authorities generadas:
+[
+    SimpleGrantedAuthority("read"),      // ✅ Sin prefijo
+    SimpleGrantedAuthority("write")      // ✅ Sin prefijo
+]
+
+// Tu SecurityConfig:
+http.authorizeHttpRequests(auth ->
+    auth.requestMatchers(ADMIN_RESOURCES).hasAuthority("write")  // ✅ FUNCIONA
+        .requestMatchers(USER_RESOURCES).hasAuthority("read"));  // ✅ FUNCIONA
+```
+
+---
+
+### 💡 Ejemplo Práctico con tu JWT
+
+#### 🎫 Tu JWT Token Real
+
+```json
+// Token generado por tu aplicación:
+{
+    "jwt": "eyJhbGciOiJIUzI1NiJ9.eyJST0xFUyI6IltWSUVXX0FDQ09VTlRdIiwic3ViIjoiYWNjb3VudEBkZWJ1Z2dlYW5kb2llYXMuY29tIiwiaWF0IjoxNzcwNjA0MzcxLCJleHAiOjE3NzA2MjIzNzF9.z3LQwigZ1NUwMWLBuGk6TI0Ub9YxirWmQM4LeQQEpmc"
+}
+
+// Decodificado (payload):
+{
+    "ROLES": "[VIEW_ACCOUNT]",
+    "sub": "account@debuggeandoieas.com",
+    "iat": 1770604371,
+    "exp": 1770622371
+}
+```
+
+#### 🔄 Proceso de Conversión
+
+```java
+// 1️⃣ Usuario envía request con token
+GET /accounts
+Authorization: Bearer eyJhbGciOiJIUzI1NiJ9...
+
+// ─────────────────────────────────────────────────────────────
+
+// 2️⃣ Spring Security intercepta y extrae el token
+String jwt = "eyJhbGciOiJIUzI1NiJ9...";
+
+// ─────────────────────────────────────────────────────────────
+
+// 3️⃣ Decodifica el JWT
+Jwt decodedJwt = {
+    header: { "alg": "HS256" },
+    claims: {
+        "ROLES": "[VIEW_ACCOUNT]",
+        "sub": "account@debuggeandoieas.com",
+        "iat": 1770604371,
+        "exp": 1770622371
+    }
+}
+
+// ─────────────────────────────────────────────────────────────
+
+// 4️⃣ JwtGrantedAuthoritiesConverter extrae authorities
+// ⚠️ Problema: Tu JWT no tiene el claim "scope" estándar
+// Solo tiene "ROLES": "[VIEW_ACCOUNT]"
+
+// Por defecto, JwtGrantedAuthoritiesConverter busca:
+String scopeClaim = jwt.getClaim("scope");  // ❌ null (no existe)
+
+// Resultado por defecto:
+Collection<GrantedAuthority> authorities = [];  // ⬅️ VACÍO!
+
+// ─────────────────────────────────────────────────────────────
+
+// 5️⃣ Usuario NO tiene authorities
+// Security check FALLA:
+.hasAuthority("write")  // ❌ authorities está vacío
+```
+
+#### ⚠️ Problema Detectado en tu Código
+
+Tu JWT tiene el claim `"ROLES": "[VIEW_ACCOUNT]"`, pero **JwtGrantedAuthoritiesConverter** por defecto solo lee el claim **`scope`**.
+
+**Solución:** Necesitas configurar el converter para leer el claim correcto:
+
+```java
+@Bean
+JwtGrantedAuthoritiesConverter jwtGrantedAuthoritiesConverter() {
+    var converter = new JwtGrantedAuthoritiesConverter();
+    converter.setAuthorityPrefix("");
+    
+    // 🔥 AGREGAR ESTA LÍNEA:
+    converter.setAuthoritiesClaimName("ROLES");  // ⬅️ Lee el claim "ROLES"
+    
+    return converter;
+}
+```
+
+---
+
+### 🔧 Métodos Adicionales de Configuración
+
+| Método | Descripción | Valor por Defecto | Ejemplo |
+|--------|-------------|-------------------|---------|
+| `setAuthorityPrefix(String)` | Prefijo para authorities | `"SCOPE_"` | `""` (tu config) |
+| `setAuthoritiesClaimName(String)` | Nombre del claim a leer | `"scope"` | `"ROLES"` (recomendado para ti) |
+| `setAuthoritiesClaimDelimiter(String)` | Delimitador de authorities | `" "` (espacio) | `","` (coma) |
+
+---
+
+### 🔀 JwtAuthenticationConverter
+
+### 🎯 ¿Qué es JwtAuthenticationConverter?
+
+```java
+@Bean
+JwtAuthenticationConverter jwtAuthenticationConverter(JwtGrantedAuthoritiesConverter settings) {
+    var converter = new JwtAuthenticationConverter();
+    converter.setJwtGrantedAuthoritiesConverter(settings);
+    return converter;
+}
+```
+
+**`JwtAuthenticationConverter`** es el **orquestador principal** que:
+1. 📥 Recibe el JWT completo
+2. 🔄 Extrae el **username** (claim `sub`)
+3. 🛡️ Extrae las **authorities** (usando `JwtGrantedAuthoritiesConverter`)
+4. 📤 Crea el objeto **`Authentication`** que Spring Security usa
+
+#### 🎭 Analogía del Mundo Real
+
+Es como un **director de orquesta**:
+
+```
+🎭 Director de Orquesta (JwtAuthenticationConverter)
+├─ 🎻 Violín (claim "sub") → Extrae el username
+├─ 🎺 Trompeta (JwtGrantedAuthoritiesConverter) → Extrae authorities
+├─ 🥁 Batería (otros claims) → Información adicional
+└─ 🎼 Crea la Sinfonía (Authentication object)
+```
+
+---
+
+### 🔗 Relación entre los Dos Converters
+
+```
+┌───────────────────────────────────────────────────────────────┐
+│             🔄 RELACIÓN ENTRE CONVERTERS                       │
+└───────────────────────────────────────────────────────────────┘
+
+📦 JwtAuthenticationConverter (ORQUESTADOR)
+   │
+   ├─ 👤 Extrae Subject (username)
+   │   └─> jwt.getClaim("sub") → "account@debuggeandoieas.com"
+   │
+   ├─ 🛡️ Delega extracción de authorities
+   │   └─> Llama a JwtGrantedAuthoritiesConverter
+   │       │
+   │       📦 JwtGrantedAuthoritiesConverter (ESPECIALISTA)
+   │          ├─ Lee claim: jwt.getClaim("scope")
+   │          ├─ Separa por espacios: ["read", "write"]
+   │          ├─ Agrega prefijo: "" (vacío)
+   │          └─> Retorna: [Authority("read"), Authority("write")]
+   │
+   └─ 🎫 Crea Authentication
+       └─> JwtAuthenticationToken(
+               principal: "account@debuggeandoieas.com",
+               authorities: [Authority("read"), Authority("write")]
+           )
+```
+
+---
+
+### 🔄 Flujo Completo de Conversión
+
+#### Código del Método
+
+```java
+@Bean
+JwtAuthenticationConverter jwtAuthenticationConverter(JwtGrantedAuthoritiesConverter settings) {
+    var converter = new JwtAuthenticationConverter();
+    converter.setJwtGrantedAuthoritiesConverter(settings);  // ⬅️ Inyecta el converter de authorities
+    return converter;
+}
+```
+
+#### Análisis
+
+| Línea | Código | Explicación |
+|-------|--------|-------------|
+| 1️⃣ | `JwtAuthenticationConverter converter = new ...()` | Crea el converter principal |
+| 2️⃣ | `converter.setJwtGrantedAuthoritiesConverter(settings)` | Inyecta el converter de authorities personalizado |
+| 3️⃣ | `return converter` | Registra como bean de Spring |
+
+---
+
+#### 🔗 Inyección de Dependencia
+
+```java
+// Spring ve este parámetro:
+JwtAuthenticationConverter jwtAuthenticationConverter(JwtGrantedAuthoritiesConverter settings)
+                                                       ↑
+                                                       └─ Spring inyecta automáticamente
+                                                          el bean que creaste antes
+
+// ¿De dónde viene "settings"?
+@Bean
+JwtGrantedAuthoritiesConverter jwtGrantedAuthoritiesConverter() {
+    // ⬅️ Este bean es inyectado como "settings"
+    var converter = new JwtGrantedAuthoritiesConverter();
+    converter.setAuthorityPrefix("");
+    return converter;
+}
+```
+
+---
+
+### 🎬 Flujo Completo: Del Token JWT al Usuario Autenticado
+
+### 📊 Diagrama de Flujo
+
+```
+┌────────────────────────────────────────────────────────────────┐
+│         🔐 FLUJO COMPLETO DE AUTENTICACIÓN JWT                  │
+└────────────────────────────────────────────────────────────────┘
+
+1️⃣ Cliente envía request con JWT
+   ├─ GET /accounts
+   └─ Header: Authorization: Bearer eyJhbGciOiJIUzI1NiJ9...
+
+                        ⬇️
+
+2️⃣ Spring Security intercepta (Filtro de seguridad)
+   └─> Extrae el token: "eyJhbGciOiJIUzI1NiJ9..."
+
+                        ⬇️
+
+3️⃣ Valida firma del JWT
+   ├─ Obtiene clave secreta: JWT_SECRET
+   ├─ Verifica firma HMAC-SHA256
+   └─> ✅ Firma válida → Continúa
+       ❌ Firma inválida → 401 Unauthorized
+
+                        ⬇️
+
+4️⃣ Decodifica el JWT (obtiene claims)
+   └─> Jwt {
+           header: { "alg": "HS256" },
+           claims: {
+               "ROLES": "[VIEW_ACCOUNT]",
+               "sub": "account@debuggeandoieas.com",
+               "iat": 1770604371,
+               "exp": 1770622371
+           }
+       }
+
+                        ⬇️
+
+5️⃣ JwtAuthenticationConverter.convert(jwt)
+   │
+   ├─ A) Extrae username
+   │   └─> jwt.getClaim("sub")
+   │       └─> "account@debuggeandoieas.com"
+   │
+   ├─ B) Extrae authorities (delega)
+   │   └─> jwtGrantedAuthoritiesConverter.convert(jwt)
+   │       │
+   │       └─> JwtGrantedAuthoritiesConverter:
+   │           ├─ Lee claim: jwt.getClaim("scope")  // ❌ null en tu caso
+   │           ├─ ⚠️ Tu JWT no tiene "scope", tiene "ROLES"
+   │           └─> Retorna: []  // ⬅️ VACÍO (problema actual)
+   │
+   └─ C) Crea Authentication
+       └─> JwtAuthenticationToken(
+               principal: "account@debuggeandoieas.com",
+               credentials: jwt,
+               authorities: []  // ⬅️ VACÍO (por el problema anterior)
+           )
+
+                        ⬇️
+
+6️⃣ Guarda en SecurityContextHolder
+   └─> SecurityContextHolder.getContext().setAuthentication(auth)
+
+                        ⬇️
+
+7️⃣ Security check
+   └─> .hasAuthority("write")
+       └─> Authorities: []  // ⬅️ VACÍO
+           └─> ❌ ACCESO DENEGADO → 403 Forbidden
+
+                        ⬇️
+
+8️⃣ Respuesta al cliente
+   └─> 403 Forbidden
+       └─> "Access Denied"
+```
+
+---
+
+### ⚠️ Problema Actual en tu Código
+
+Tu JWT tiene este formato:
+
+```json
+{
+    "ROLES": "[VIEW_ACCOUNT]",
+    "sub": "account@debuggeandoieas.com",
+    "iat": 1770604371,
+    "exp": 1770622371
+}
+```
+
+Pero **`JwtGrantedAuthoritiesConverter`** por defecto busca el claim **`scope`**, no **`ROLES`**.
+
+---
+
+### ✅ Solución: Configurar el Claim Correcto
+
+```java
+@Bean
+JwtGrantedAuthoritiesConverter jwtGrantedAuthoritiesConverter() {
+    var converter = new JwtGrantedAuthoritiesConverter();
+    converter.setAuthorityPrefix("");  // Sin prefijo
+    converter.setAuthoritiesClaimName("ROLES");  // ⬅️ AGREGAR ESTA LÍNEA
+    return converter;
+}
+```
+
+#### 🔄 Flujo Corregido
+
+```
+5️⃣ JwtAuthenticationConverter.convert(jwt)
+   │
+   ├─ B) Extrae authorities (delega)
+   │   └─> jwtGrantedAuthoritiesConverter.convert(jwt)
+   │       │
+   │       └─> JwtGrantedAuthoritiesConverter:
+   │           ├─ Lee claim: jwt.getClaim("ROLES")  // ✅ Ahora lee "ROLES"
+   │           ├─ Valor: "[VIEW_ACCOUNT]"
+   │           ├─ Parsea: ["VIEW_ACCOUNT"]
+   │           ├─ Agrega prefijo: "" (vacío)
+   │           └─> Retorna: [Authority("VIEW_ACCOUNT")]  // ✅ Correcto
+   │
+   └─ C) Crea Authentication
+       └─> JwtAuthenticationToken(
+               principal: "account@debuggeandoieas.com",
+               credentials: jwt,
+               authorities: [Authority("VIEW_ACCOUNT")]  // ✅ Ahora tiene authorities
+           )
+```
+
+---
+
+### 🧪 Casos de Uso Prácticos
+
+### 📌 Caso 1: OAuth2 con Scopes Estándar
+
+**Escenario:** Servidor OAuth2 que usa el claim `scope` estándar
+
+```java
+// JWT generado por servidor OAuth2:
+{
+    "sub": "user@example.com",
+    "scope": "read write delete",
+    "exp": 1770622371
+}
+
+// Configuración:
+@Bean
+JwtGrantedAuthoritiesConverter jwtGrantedAuthoritiesConverter() {
+    var converter = new JwtGrantedAuthoritiesConverter();
+    converter.setAuthorityPrefix("");  // Sin prefijo
+    // No necesitas setAuthoritiesClaimName porque "scope" es el default
+    return converter;
+}
+
+// Authorities generadas:
+[
+    Authority("read"),
+    Authority("write"),
+    Authority("delete")
+]
+
+// Security config:
+http.authorizeHttpRequests(auth ->
+    auth.requestMatchers("/admin/**").hasAuthority("delete")  // ✅ Funciona
+        .requestMatchers("/user/**").hasAuthority("read"));   // ✅ Funciona
+```
+
+---
+
+### 📌 Caso 2: JWT Personalizado con Roles (Tu Caso)
+
+**Escenario:** JWT personalizado con claim `ROLES`
+
+```java
+// JWT generado por tu aplicación:
+{
+    "sub": "account@debuggeandoieas.com",
+    "ROLES": "[VIEW_ACCOUNT]",
+    "exp": 1770622371
+}
+
+// Configuración:
+@Bean
+JwtGrantedAuthoritiesConverter jwtGrantedAuthoritiesConverter() {
+    var converter = new JwtGrantedAuthoritiesConverter();
+    converter.setAuthorityPrefix("");
+    converter.setAuthoritiesClaimName("ROLES");  // ⬅️ Lee "ROLES" en lugar de "scope"
+    return converter;
+}
+
+// Authorities generadas:
+[
+    Authority("VIEW_ACCOUNT")
+]
+
+// Security config:
+http.authorizeHttpRequests(auth ->
+    auth.requestMatchers("/accounts/**").hasAuthority("VIEW_ACCOUNT"));  // ✅ Funciona
+```
+
+---
+
+### 📌 Caso 3: Múltiples Roles con Prefijo
+
+**Escenario:** JWT con roles que necesitan prefijo `ROLE_`
+
+```java
+// JWT:
+{
+    "sub": "admin@example.com",
+    "authorities": "ADMIN USER MODERATOR",
+    "exp": 1770622371
+}
+
+// Configuración:
+@Bean
+JwtGrantedAuthoritiesConverter jwtGrantedAuthoritiesConverter() {
+    var converter = new JwtGrantedAuthoritiesConverter();
+    converter.setAuthorityPrefix("ROLE_");  // ⬅️ Agrega prefijo "ROLE_"
+    converter.setAuthoritiesClaimName("authorities");
+    return converter;
+}
+
+// Authorities generadas:
+[
+    Authority("ROLE_ADMIN"),
+    Authority("ROLE_USER"),
+    Authority("ROLE_MODERATOR")
+]
+
+// Security config:
+http.authorizeHttpRequests(auth ->
+    auth.requestMatchers("/admin/**").hasRole("ADMIN"));  // ✅ Funciona
+    // hasRole("ADMIN") internamente busca "ROLE_ADMIN"
+```
+
+---
+
+### 📌 Caso 4: Delimitador Personalizado
+
+**Escenario:** JWT con roles separados por comas
+
+```java
+// JWT:
+{
+    "sub": "user@example.com",
+    "permissions": "read,write,delete",
+    "exp": 1770622371
+}
+
+// Configuración:
+@Bean
+JwtGrantedAuthoritiesConverter jwtGrantedAuthoritiesConverter() {
+    var converter = new JwtGrantedAuthoritiesConverter();
+    converter.setAuthorityPrefix("");
+    converter.setAuthoritiesClaimName("permissions");
+    converter.setAuthoritiesClaimDelimiter(",");  // ⬅️ Usa coma como delimitador
+    return converter;
+}
+
+// Authorities generadas:
+[
+    Authority("read"),
+    Authority("write"),
+    Authority("delete")
+]
+```
+
+---
+
+### 🎓 Resumen y Mejores Prácticas
+
+### 📊 Tabla Comparativa de Converters
+
+| Aspecto | JwtGrantedAuthoritiesConverter | JwtAuthenticationConverter |
+|---------|-------------------------------|---------------------------|
+| **Propósito** | Extraer authorities del JWT | Convertir JWT completo a Authentication |
+| **Enfoque** | Especialista en authorities | Orquestador general |
+| **Input** | JWT (objeto Jwt) | JWT (objeto Jwt) |
+| **Output** | `Collection<GrantedAuthority>` | `AbstractAuthenticationToken` |
+| **Configurable** | Prefijo, claim name, delimiter | Converter de authorities, principal extractor |
+| **Dependencias** | Ninguna | JwtGrantedAuthoritiesConverter |
+
+---
+
+### ✅ Mejores Prácticas
+
+#### 1️⃣ **Siempre configura el claim correcto**
+
+```java
+// ❌ MAL: Asume que el claim es "scope"
+@Bean
+JwtGrantedAuthoritiesConverter jwtGrantedAuthoritiesConverter() {
+    return new JwtGrantedAuthoritiesConverter();  // Usa defaults
+}
+
+// ✅ BIEN: Especifica el claim que usas
+@Bean
+JwtGrantedAuthoritiesConverter jwtGrantedAuthoritiesConverter() {
+    var converter = new JwtGrantedAuthoritiesConverter();
+    converter.setAuthoritiesClaimName("ROLES");  // ⬅️ Explícito
+    return converter;
+}
+```
+
+---
+
+#### 2️⃣ **Elimina prefijos innecesarios**
+
+```java
+// ❌ MAL: Prefijo por defecto causa problemas
+// Genera: "SCOPE_read" cuando necesitas "read"
+
+// ✅ BIEN: Sin prefijo para authorities simples
+converter.setAuthorityPrefix("");
+
+// ✅ BIEN: Con prefijo para roles
+converter.setAuthorityPrefix("ROLE_");  // Para usar hasRole()
+```
+
+---
+
+#### 3️⃣ **Usa nombres de claims estándar cuando sea posible**
+
+| Standard OAuth2 | Recomendado |
+|-----------------|-------------|
+| `scope` | ✅ Para permisos OAuth2 |
+| `scp` | ✅ Alias de `scope` |
+| `authorities` | ✅ Para Spring Security |
+| `roles` | ✅ Para roles de aplicación |
+| `ROLES` | ⚠️ Funciona pero no es estándar |
+
+---
+
+#### 4️⃣ **Configura correctamente en SecurityFilterChain**
+
+```java
+@Bean
+SecurityFilterChain securityFilterChain(HttpSecurity http, 
+                                       JwtAuthenticationConverter jwtConverter) throws Exception {
+    http.oauth2ResourceServer(oauth ->
+        oauth.jwt(jwt -> 
+            jwt.jwtAuthenticationConverter(jwtConverter)  // ⬅️ Inyecta tu converter
+        )
+    );
+    return http.build();
+}
+```
+
+---
+
+### 🔧 Configuración Recomendada para tu Proyecto
+
+```java
+@Bean
+JwtGrantedAuthoritiesConverter jwtGrantedAuthoritiesConverter() {
+    var converter = new JwtGrantedAuthoritiesConverter();
+    converter.setAuthorityPrefix("");  // Sin prefijo
+    converter.setAuthoritiesClaimName("ROLES");  // ⬅️ AGREGAR ESTA LÍNEA
+    return converter;
+}
+
+@Bean
+JwtAuthenticationConverter jwtAuthenticationConverter(JwtGrantedAuthoritiesConverter converter) {
+    var jwtConverter = new JwtAuthenticationConverter();
+    jwtConverter.setJwtGrantedAuthoritiesConverter(converter);
+    return jwtConverter;
+}
+```
+
+---
+
+### 🎯 Puntos Clave a Recordar
+
+1. 🔄 **JwtGrantedAuthoritiesConverter** → Extrae authorities (roles/permisos)
+2. 🔀 **JwtAuthenticationConverter** → Orquesta todo el proceso de conversión
+3. 🎫 **Claim name** → Debe coincidir con tu JWT (`"ROLES"` en tu caso)
+4. 🏷️ **Prefix** → Vacío `""` para authorities simples, `"ROLE_"` para roles
+5. 🔗 **Inyección** → Spring conecta automáticamente los dos converters
+6. ⚙️ **OAuth2 Resource Server** → Usa estos converters para validar JWT
+
+---
+
+### 🐛 Troubleshooting
+
+| Problema | Causa | Solución |
+|----------|-------|----------|
+| `403 Forbidden` | Authorities vacías | Configura `setAuthoritiesClaimName()` |
+| `hasAuthority("read")` falla | Prefijo incorrecto | `setAuthorityPrefix("")` |
+| `hasRole("ADMIN")` falla | Sin prefijo `ROLE_` | `setAuthorityPrefix("ROLE_")` |
+| Authorities `null` | Claim no existe en JWT | Verifica que el JWT tenga el claim correcto |
+| Delimitador incorrecto | Usa comas en lugar de espacios | `setAuthoritiesClaimDelimiter(",")` |
+
+---
+
+### 🎉 Conclusión
+
+Los **JWT Converters** son piezas fundamentales en la arquitectura de seguridad OAuth2:
+
+```
+🔐 JWT Token
+    ↓
+🔄 JwtAuthenticationConverter (Orquestador)
+    ├─ 👤 Extrae username
+    └─ 🛡️ JwtGrantedAuthoritiesConverter (Especialista)
+        └─ Extrae authorities
+    ↓
+✅ Authentication (Usuario autenticado)
+    ├─ Principal: "account@debuggeandoieas.com"
+    └─ Authorities: ["VIEW_ACCOUNT"]
+    ↓
+🎯 Security checks: hasAuthority(), hasRole()
+```
+
+**Próximo paso recomendado:** Agregar `setAuthoritiesClaimName("ROLES")` a tu configuración para que funcione correctamente con tu JWT personalizado. 🚀
+
+
 
 ---
 
