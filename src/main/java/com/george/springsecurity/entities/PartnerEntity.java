@@ -17,7 +17,7 @@ public class PartnerEntity {
     private String clientName;
     private String clientSecret;
     private String scopes;
-    private String grandTypes;
+    private String grantTypes;
     private String authenticationMethods;
     private String redirectUri;
     private String redirectUriLogout;

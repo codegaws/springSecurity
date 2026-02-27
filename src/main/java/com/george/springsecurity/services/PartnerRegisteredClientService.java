@@ -25,7 +25,7 @@ public class PartnerRegisteredClientService implements RegisteredClientRepositor
 
         return partnerOpt.map(partner -> {
 
-            var authorizationGranTypes = Arrays.stream(partner.getGrandTypes().split(","))
+            var authorizationGrantTypes = Arrays.stream(partner.getGrantTypes().split(","))
                     .map(AuthorizationGrantType::new)
                     .toList();
 
@@ -38,6 +38,7 @@ public class PartnerRegisteredClientService implements RegisteredClientRepositor
 
             return RegisteredClient
                     .withId(partner.getId().toString())
+                    .clientId(partner.getClientId())
                     .clientSecret(partner.getClientSecret())
                     .clientName(partner.getClientName())
                     .redirectUri(partner.getRedirectUri())
@@ -46,8 +47,8 @@ public class PartnerRegisteredClientService implements RegisteredClientRepositor
                     .clientAuthenticationMethod(clientAuthorizationMethods.get(1))
                     .scope(scopes.get(0))
                     .scope(scopes.get(1))
-                    .authorizationGrantType(authorizationGranTypes.get(0))
-                    .authorizationGrantType(authorizationGranTypes.get(1))
+                    .authorizationGrantType(authorizationGrantTypes.get(0))
+                    .authorizationGrantType(authorizationGrantTypes.get(1))
                     .tokenSettings(this.tokenSettings())
                     .build();
         }).orElseThrow(() -> new BadCredentialsException("Client no exists"));
@@ -69,6 +70,5 @@ public class PartnerRegisteredClientService implements RegisteredClientRepositor
                 .build();
     }
 
-    ;
 
 }

@@ -1,6 +1,10 @@
 package com.george.springsecurity.security;
 
 import com.george.springsecurity.services.CustomerUserDetails;
+import com.nimbusds.jose.jwk.JWKSet;
+import com.nimbusds.jose.jwk.RSAKey;
+import com.nimbusds.jose.jwk.source.JWKSource;
+import com.nimbusds.jose.proc.SecurityContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
@@ -12,17 +16,28 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.server.authorization.OAuth2TokenType;
 import org.springframework.security.oauth2.server.authorization.client.InMemoryRegisteredClientRepository;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
 import org.springframework.security.oauth2.server.authorization.config.annotation.web.configuration.OAuth2AuthorizationServerConfiguration;
 import org.springframework.security.oauth2.server.authorization.config.annotation.web.configurers.OAuth2AuthorizationServerConfigurer;
 import org.springframework.security.oauth2.server.authorization.settings.AuthorizationServerSettings;
+import org.springframework.security.oauth2.server.authorization.token.JwtEncodingContext;
+import org.springframework.security.oauth2.server.authorization.token.OAuth2TokenCustomizer;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint;
 
+import java.security.KeyPair;
+import java.security.KeyPairGenerator;
+import java.security.NoSuchAlgorithmException;
+import java.security.interfaces.RSAPrivateKey;
+import java.security.interfaces.RSAPublicKey;
+import java.time.LocalDateTime;
+import java.util.Map;
 import java.util.UUID;
 
 @Configuration
@@ -96,6 +111,58 @@ public class SecurityConfig {
         return converter;
     }
 
+    @Bean
+    JWKSource<SecurityContext> jwkSource() {
+        var rsa = generateKeys();
+        var jwkSet = new JWKSet(rsa);
+        return (jwkSelector, securityContext) -> jwkSelector.select(jwkSet);
+    }
+
+    @Bean
+    JwtDecoder jwtDecoder(JWKSource<SecurityContext> jwkSource) {
+        return OAuth2AuthorizationServerConfiguration.jwtDecoder(jwkSource);
+    }
+
+    @Bean
+    OAuth2TokenCustomizer<JwtEncodingContext> oAuth2TokenCustomizer() {
+        return context -> {
+            if (context.getTokenType().equals(OAuth2TokenType.ACCESS_TOKEN)) {
+                context.getClaims().claims(claim ->
+                        claim.putAll(Map.of(
+                                "owner",
+                                APPLICATION_OWNER,
+                                "data_request",
+                                LocalDateTime.now().toString())));
+            }
+        };
+    }
+
+    private static KeyPair generateRSA() {
+        KeyPair keyPair;
+
+        try {
+            var keyPairGenerator = KeyPairGenerator.getInstance(RSA);
+            keyPairGenerator.initialize(RSA_SIZE);
+            keyPair = keyPairGenerator.generateKeyPair();
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException(e);
+        }
+        return keyPair;
+    }
+
+    private static RSAKey generateKeys() {
+        var keyPair = generateRSA();
+        var publicKey = (RSAPublicKey) keyPair.getPublic();
+        var privateKey = (RSAPrivateKey) keyPair.getPrivate();
+        return new RSAKey
+                .Builder(publicKey)
+                .privateKey(privateKey)
+                .keyID(UUID.randomUUID().toString())
+                .build();
+
+    }
+
+
     private static final String[] USER_RESOURCES = {"/loans/**", "/balance/**"};
     private static final String[] ADMIN_RESOURCES = {"/accounts/**", "/cards/**"};
     private static final String AUTH_WRITE = "write";
@@ -103,4 +170,8 @@ public class SecurityConfig {
     private static final String ROLE_ADMIN = "ADMIN";
     private static final String ROLE_USER = "USER";
     private static final String LOGIN_RESOURCE = "/login";
+    private static final String RSA = "RSA";
+    private static final Integer RSA_SIZE = 2048;
+    private static final String APPLICATION_OWNER = "Debugueando ideas";
+
 }
