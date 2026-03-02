@@ -4845,8 +4845,10 @@ public class SpringSecurityApplication implements CommandLineRunner {
 ```
 #### Resultado en consola:
 
+```text
 user:$2a$10$ilrQR0yy4oUfDp0cQFpiwO8Cq78Wk0NtvTIB4TsLcVEFYWQHnHk7G
 client:$2a$10$p3XsR8MRzgI4Z08J68x.0u.VGC1HUGLLlwr6jAU.AjKXspY1gHNQe
+```
 
 - Bajamos la BD y actualizamos las contraseñas con los valores codificados.
 - Levantamos con docker compose up -d y probamos el login con postman usando el client_id y client_secret definidos en la BD.

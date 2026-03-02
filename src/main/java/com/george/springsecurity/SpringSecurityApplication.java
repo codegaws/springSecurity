@@ -8,8 +8,18 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 
 
 @SpringBootApplication
-public class SpringSecurityApplication  {
+public class SpringSecurityApplication  implements CommandLineRunner {
+
+    @Autowired
+    PasswordEncoder passwordEncoder;
+
     public static void main(String[] args) {
         SpringApplication.run(SpringSecurityApplication.class, args);
+    }
+
+    @Override
+    public void run(String... args) throws Exception {
+        System.out.println("user:" + this.passwordEncoder.encode("to_be_encoded"));
+        System.out.println("client:" + this.passwordEncoder.encode("secret"));
     }
 }
