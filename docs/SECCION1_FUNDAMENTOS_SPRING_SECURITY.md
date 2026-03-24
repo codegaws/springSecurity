@@ -1,6 +1,7 @@
 # 🛡️ SECCION1_FUNDAMENTOS_SPRING_SECURITY 🛡️
 
 ## 📝 Clase 1 - Conoce el flujo de autenticacion spring secutiry 🔒 🔒 🔑🔑
+
 ![image](img/1.png)
 
 ## 📝 Clase 2 - ¿Que es la seguridad en la aplicacion web y porque usar spring security?🔒 🔒 🔑🔑
